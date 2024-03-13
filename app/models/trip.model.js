@@ -60,6 +60,10 @@ module.exports = (sequelize, Sequelize) => {
             foreignKey: 'tripid',
             as: 'tripStaff'
         });
+        Trip.hasMany(models.TripGroup, {
+            foreignKey: 'trip_id',
+            as: 'tripGroups' 
+        });
     };
 
     return Trip;

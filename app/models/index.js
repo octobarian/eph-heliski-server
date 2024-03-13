@@ -49,6 +49,7 @@ db.helicopters = require('./helicopter.model.js')(sequelize, Sequelize);
 db.trips = require('./trip.model.js')(sequelize, Sequelize);
 db.tripStaff = require('./tripStaff.model.js')(sequelize, Sequelize);
 db.tripClients = require('./tripclient.model.js')(sequelize, Sequelize);
+db.tripGroups = require('./tripGroup.model.js')(sequelize, Sequelize);
 
 //Equipment Imports (heli, beacon, van, etc)
 db.beacons = require('./beacon.model.js')(sequelize, Sequelize);
@@ -105,6 +106,15 @@ db.tripStaff.belongsTo(db.staffs, { foreignKey: 'staffid', as: 'staff' });
 db.tripClients.belongsTo(db.clients, { foreignKey: 'clientid', as: 'client' });
 db.clients.hasMany(db.tripClients, { foreignKey: 'clientid', as: 'tripClients' });
 db.tripClients.belongsTo(db.reservation, {foreignKey: 'reservationid',as: 'reservation'});
+
+// TripGroup Associations
+db.trips.hasMany(db.tripGroups, { foreignKey: 'trip_id', as: 'tripGroups' });
+db.staffs.hasMany(db.tripGroups, { foreignKey: 'guide_id', as: 'guidedGroups' });
+db.tripGroups.belongsTo(db.staffs, { foreignKey: 'guide_id', as: 'guide' });
+
+// Modify the TripClient associations
+db.tripClients.belongsTo(db.tripGroups, { foreignKey: 'trip_group_id', as: 'tripGroup' });
+db.tripGroups.hasMany(db.tripClients, { foreignKey: 'trip_group_id', as: 'tripClients' });
 
 // Beacon Associations
 db.beacons.belongsTo(db.tripClients, { foreignKey: 'tripclientid', as: 'tripClient', allowNull: true });

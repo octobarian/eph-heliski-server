@@ -28,12 +28,28 @@ module.exports = (sequelize, Sequelize) => {
           model: 'reservation',
           key: 'reservationid'
         }
-      }
+      },
+      trip_group_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+            model: 'TripGroup',
+            key: 'trip_group_id'
+        }
+      },
     }, {
       tableName: 'tripclient',
       timestamps: false
     });
   
+    TripClient.associate = models => {
+      // Adjust the association, remove the one with trips and replace with trip groups
+      TripClient.belongsTo(models.TripGroup, {
+          foreignKey: 'trip_group_id',
+          as: 'tripGroup'
+      });
+  };
+
     return TripClient;
   };
   

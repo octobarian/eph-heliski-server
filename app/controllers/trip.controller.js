@@ -7,6 +7,8 @@ const Helicopter = db.helicopters;
 const Person = db.persons;
 const TripStaff = db.tripStaff;
 const TripClient = db.tripClients;
+const TripGroup = db.tripGroups;
+const Reservation = db.reservation;
 const Job = db.jobs;
 
 //util imports
@@ -217,12 +219,105 @@ exports.fetchHelicopters = (req, res) => {
     });
 };
 
+//OLD WORKING FINDBYDATE
+// exports.findByDate = (req, res) => {
+//     const date = req.params.date;
+
+//     Trip.findAll({
+//         where: { date: date },
+//         include: [
+//             {
+//                 model: Helicopter,
+//                 as: 'helicopter',
+//             },
+//             {
+//                 model: Staff,
+//                 as: 'pilot',
+//                 include: {
+//                     model: Person,
+//                     as: 'person'
+//                 }
+//             },
+//             {
+//                 model: TripStaff,
+//                 as: 'tripStaff',
+//                 include: {
+//                     model: Staff,
+//                     as: 'staff',
+//                     include: [
+//                         {
+//                             model: Person,
+//                             as: 'person'
+//                         },
+//                         {
+//                             model: Job,
+//                             as: 'job'
+//                         }
+//                     ]
+//                 }
+//             },
+//             // Include Reservations associated with the trip
+//             {
+//                 model: db.reservation,
+//                 as: 'reservations',
+//                 include: [
+//                   {
+//                     model: db.persons,
+//                     as: 'person',
+//                     attributes: ['firstname', 'lastname', 'weight'] // Select only required attributes
+//                   }
+//                 ],
+//                 attributes: ['reservationid'],
+//                 through: { attributes: [] } // Exclude the join table attributes
+//             }
+//         ]
+//     })
+//     .then(data => {
+//         const formattedData = data.map(trip => {
+//             // Extract guides, pilot, helicopter, and reservation details
+//             // Extract guides from tripStaff
+//             const guides = trip.tripStaff
+//                 .filter(staffMember => staffMember.staff && staffMember.staff.job && staffMember.staff.job.jobid === 2)
+//                 .map(staffMember => staffMember.staff.person);
+
+// //             // Pilot is directly associated with the trip
+//             const pilot = trip.pilot ? trip.pilot.person : null;
+
+// //             // Extract reservationids associated with the trip
+//             const reservationids = trip.reservations.map(reservation => reservation.reservationid);
+
+//             // Extract reservation details with person info
+//             const reservationPersons = trip.reservations.map(reservation => ({
+//                 reservationid: reservation.reservationid,
+//                 person: reservation.person // This will have firstname, lastname, and weight
+//             }));
+
+//             return {
+//                 ...trip.toJSON(),
+//                 guides: guides,
+//                 pilot: pilot,
+//                 helicopter: trip.helicopter,
+//                 reservationids: reservationids,  // Existing reservation IDs
+//                 reservationPersons: reservationPersons // New object with reservation details including person
+//             };
+//         });
+
+//         res.send(formattedData);
+//     })
+//     .catch(err => {
+//         res.status(500).send({
+//             message: err.message || "Some error occurred while retrieving trips."
+//         });
+//     });
+// };
+
 exports.findByDate = (req, res) => {
     const date = req.params.date;
 
     Trip.findAll({
         where: { date: date },
         include: [
+            //Information contained within a trip: Helicopter, Staff(Pilot), TripStaff->Staff(guide)
             {
                 model: Helicopter,
                 as: 'helicopter',
@@ -253,59 +348,111 @@ exports.findByDate = (req, res) => {
                     ]
                 }
             },
-            // Include Reservations associated with the trip
+            //Gather the groups associated to the trip via the trip_group_id
             {
-                model: db.reservation,
-                as: 'reservations',
+                model: TripGroup, 
+                as: 'tripGroups',
                 include: [
-                  {
-                    model: db.persons,
-                    as: 'person',
-                    attributes: ['firstname', 'lastname', 'weight'] // Select only required attributes
-                  }
+                    {
+                        model: TripClient, 
+                        as: 'tripClients',
+                        include: [
+                            {
+                                model: Reservation,
+                                as: 'reservation',
+                                include: [
+                                    {
+                                        model: Person,
+                                        as: 'person',
+                                        attributes: ['firstname', 'lastname', 'weight'] // Select only required attributes
+                                    }
+                                ],
+                                attributes: ['reservationid'],
+                            }
+                        ],
+                        attributes: ['tripclientid']
+                    },
+                    {
+                        model: Staff,
+                        as: 'guide',
+                        include: {
+                            model: Person,
+                            as: 'person'
+                        }
+                    }
                 ],
-                attributes: ['reservationid'],
-                through: { attributes: [] } // Exclude the join table attributes
-            }
+                attributes: ['trip_group_id']
+            },
         ]
     })
     .then(data => {
         const formattedData = data.map(trip => {
-            // Extract guides, pilot, helicopter, and reservation details
-            // Extract guides from tripStaff
-            const guides = trip.tripStaff
-                .filter(staffMember => staffMember.staff && staffMember.staff.job && staffMember.staff.job.jobid === 2)
-                .map(staffMember => staffMember.staff.person);
-
-//             // Pilot is directly associated with the trip
-            const pilot = trip.pilot ? trip.pilot.person : null;
-
-//             // Extract reservationids associated with the trip
-            const reservationids = trip.reservations.map(reservation => reservation.reservationid);
-
-            // Extract reservation details with person info
-            const reservationPersons = trip.reservations.map(reservation => ({
-                reservationid: reservation.reservationid,
-                person: reservation.person // This will have firstname, lastname, and weight
-            }));
-
+            const pilot = trip.pilot ? {
+                staffid: trip.pilotid, // Including pilotid
+                firstname: trip.pilot.person.firstname,
+                lastname: trip.pilot.person.lastname
+            } : null;
+    
+            const helicopter = trip.helicopter ? {
+                helicopterid: trip.helicopterid, // Including helicopterid
+                model: trip.helicopter.model,
+                callsign: trip.helicopter.callsign
+            } : null;
+    
+            const groups = trip.tripGroups.map(group => {
+                const guide = group.guide ? {
+                    guideid: group.guide.staffid,
+                    firstname: group.guide.person.firstname,
+                    lastname: group.guide.person.lastname
+                } : null;
+    
+                const clients = group.tripClients.map(client => {
+                    return {
+                        tripClientId: client.tripclientid,
+                        reservationId: client.reservations ? client.reservations.reservationid : null,
+                        person: client.reservations ? {
+                            firstname: client.reservations.person.firstname,
+                            lastname: client.reservations.person.lastname,
+                            weight: client.reservations.person.weight
+                        } : null
+                    };
+                });
+    
+                return {
+                    groupId: group.groupid,
+                    guide: guide,
+                    clients: clients
+                };
+            });
+    
             return {
-                ...trip.toJSON(),
-                guides: guides,
+                tripId: trip.tripid,
+                date: trip.date,
+                totalVertical: trip.totalvertical,
                 pilot: pilot,
-                helicopter: trip.helicopter,
-                reservationids: reservationids,  // Existing reservation IDs
-                reservationPersons: reservationPersons // New object with reservation details including person
+                helicopter: helicopter,
+                groups: groups
             };
         });
-
         res.send(formattedData);
     })
     .catch(err => {
+        console.error("Error occurred while retrieving trips:", err);
+        console.error("Error Details:", err.message);
+        console.error("Stack Trace:", err.stack);
+    
+        // If possible, log specific details to help isolate the issue
+        if(err instanceof Sequelize.EagerLoadingError) {
+            console.error("EagerLoadingError: Issue with one of the 'include' statements.");
+        }
+    
         res.status(500).send({
-            message: err.message || "Some error occurred while retrieving trips."
+            message: "An error occurred while trying to fetch trips.",
+            errorDetails: err.message,
         });
     });
+    
+    
 };
 
 exports.findByGuideAndDate = (req, res) => {

@@ -38,7 +38,11 @@ module.exports = (sequelize, Sequelize) => {
             foreignKey: 'jobid',
             as: 'job'
         });
-        // Add other associations here as necessary
+        // Add a reverse association to TripGroup
+        Staff.hasMany(models.TripGroup, {
+            foreignKey: 'guide_id',
+            as: 'guidedGroups' // This alias must match how you refer to this association elsewhere in your code
+        });
     };
 
     return Staff;
