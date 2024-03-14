@@ -10,14 +10,18 @@ module.exports = app => {
     // router.delete("/", trips.deleteAll); // Delete all trips
 
     router.post("/", trips.create);
+    router.post("/group/:tripId", trips.createGroup);
+    router.put('/group/:groupId/guide', trips.updateGroupGuide);
 
     router.delete("/id/:id", trips.delete);
+    // Add a route for deleting a group by its ID
+    router.delete("/group/:groupId", trips.deleteGroup);
 
     router.put("/id/:id", trips.updateTrip);
 
     // Fetch guides
     router.get("/guides", trips.fetchGuides);
-
+    
     // Fetch pilots
     router.get("/pilots", trips.fetchPilots);
 

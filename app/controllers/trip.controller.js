@@ -14,7 +14,19 @@ const Job = db.jobs;
 //util imports
 const { translatePersonIdToClientId } = require('../utility/clientPersonTranslation'); // Update the path according to your project structure
 
+function calculateAge(dateOfBirthString) {
+    const birthday = new Date(dateOfBirthString);
+    const today = new Date();
+    let age = today.getFullYear() - birthday.getFullYear();
+    const monthDifference = today.getMonth() - birthday.getMonth();
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthday.getDate())) {
+        age--; // Subtract one year if the birthday has not occurred this year
+    }
+    return age;
+}
+
 // Add models and associations as needed, similar to staff.controller.js
+
 
 //Delete a trip by its ID
 exports.delete = async (req, res) => {
@@ -180,6 +192,27 @@ exports.fetchGuides = (req, res) => {
         });
     });
 };
+
+exports.updateGroupGuide = async (req, res) => {
+    const { groupId } = req.params;
+    const { guideId } = req.body;
+    console.log('FOUND GUIDEID: '+guideId);
+    console.log('FOUND GROUPID: '+groupId);
+  
+    try {
+      const group = await TripGroup.findByPk(groupId);
+      if (group) {
+        group.guide_id = guideId;
+        await group.save();
+        res.send({ message: "Guide updated successfully." });
+      } else {
+        res.status(404).send({ message: "Group not found." });
+      }
+    } catch (error) {
+      res.status(500).send({ message: "Error updating guide for group." });
+    }
+  };
+  
 
 // Fetch pilots from the database (jobid 1 for pilots)
 exports.fetchPilots = (req, res) => {
@@ -364,7 +397,7 @@ exports.findByDate = (req, res) => {
                                     {
                                         model: Person,
                                         as: 'person',
-                                        attributes: ['firstname', 'lastname', 'weight'] // Select only required attributes
+                                        attributes: ['firstname', 'lastname', 'weight', 'personid', 'dateofbirth'] // Select only required attributes
                                     }
                                 ],
                                 attributes: ['reservationid'],
@@ -407,19 +440,31 @@ exports.findByDate = (req, res) => {
                 } : null;
     
                 const clients = group.tripClients.map(client => {
+                    //console.log('Processing client:', client.tripclientid); // Log the trip client ID being processed
+                    
+                    // Check if client has reservation and person data
+                    const hasReservation = !!client.reservation;
+                    //console.log(`Client ${client.tripclientid} has reservation:`, hasReservation);
+                    
+                    if (hasReservation) {
+                        //console.log(`Reservation details for client ${client.tripclientid}:`, client.reservation);
+                    }
+                
                     return {
                         tripClientId: client.tripclientid,
-                        reservationId: client.reservations ? client.reservations.reservationid : null,
-                        person: client.reservations ? {
-                            firstname: client.reservations.person.firstname,
-                            lastname: client.reservations.person.lastname,
-                            weight: client.reservations.person.weight
+                        reservationId: hasReservation ? client.reservation.reservationid : null,
+                        person: hasReservation ? {
+                            firstname: client.reservation.person.firstname,
+                            lastname: client.reservation.person.lastname,
+                            weight: client.reservation.person.weight,
+                            id: client.reservation.person.personid,
+                            age: calculateAge(client.reservation.person.dateofbirth), 
                         } : null
                     };
                 });
-    
+                
                 return {
-                    groupId: group.groupid,
+                    groupid: group.trip_group_id?group.trip_group_id:null,
                     guide: guide,
                     clients: clients
                 };
@@ -454,6 +499,74 @@ exports.findByDate = (req, res) => {
     
     
 };
+
+// Delete a group and its associated clients
+exports.deleteGroup = async (req, res) => {
+    const groupId = req.params.groupId;
+  
+    try {
+        // Start a transaction
+        const transaction = await db.sequelize.transaction();
+
+        try {
+            // Delete associated TripClients first
+            await TripClient.destroy({
+                where: { trip_group_id: groupId },
+                transaction
+            });
+
+            // Then, delete the TripGroup
+            await TripGroup.destroy({
+                where: { trip_group_id: groupId },
+                transaction
+            });
+
+            // If everything went fine, commit the transaction
+            await transaction.commit();
+            res.send({
+                message: "Group and its clients were deleted successfully!"
+            });
+        } catch (error) {
+            // If an error occurs, rollback the transaction
+            await transaction.rollback();
+            console.error("Error during group deletion transaction:", error);
+            res.status(500).send({
+                message: "Could not delete the group with groupId=" + groupId
+            });
+        }
+    } catch (error) {
+        console.error("Transaction error on deleting group with groupId=" + groupId, error);
+        res.status(500).send({
+            message: "Transaction error on deleting group with groupId=" + groupId
+        });
+    }
+};
+
+exports.createGroup = async (req, res) => {
+    const tripId = req.params.tripId; // or req.body.tripId depending on how you're passing it
+
+    // Check if tripId is not undefined or null
+    if (!tripId) {
+        return res.status(400).send({
+            message: "Trip ID must be provided."
+        });
+    }
+
+    try {
+        // Assuming sequelize for ORM
+        const newGroup = await TripGroup.create({ trip_id: tripId });
+        return res.status(201).send(newGroup);
+    } catch (error) {
+        console.error("Error creating new group:", error);
+        return res.status(500).send({
+            message: "Error creating new group",
+            error: error.message,
+        });
+    }
+};
+
+
+
 
 exports.findByGuideAndDate = (req, res) => {
     const staffId = req.params.staffId;

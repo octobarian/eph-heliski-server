@@ -15,7 +15,7 @@ module.exports = (sequelize, Sequelize) => {
         },
         guide_id: { // Foreign key to 'staff' table
             type: Sequelize.INTEGER,
-            allowNull: false,
+            allowNull: true,
             references: {
                 model: 'staff', // This should match the table name as defined in Sequelize
                 key: 'staffid'
