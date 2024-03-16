@@ -16,6 +16,9 @@ module.exports = app => {
     router.delete("/id/:id", trips.delete);
     // Add a route for deleting a group by its ID
     router.delete("/group/:groupId", trips.deleteGroup);
+    // delete a client from a group
+    router.delete('/group/:groupId/tripClient/:tripClientId', trips.removeClientFromGroup);
+
 
     router.put("/id/:id", trips.updateTrip);
 

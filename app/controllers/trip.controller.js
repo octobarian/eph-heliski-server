@@ -170,8 +170,61 @@ exports.updateTrip = async (req, res) => {
     }
 };
 
+// Remove a client from a group (used in Greeting-Office.vue)
+exports.removeClientFromGroup = async (req, res) => {
+    const { groupId, tripClientId } = req.params;
 
-  
+    try {
+        // Start a transaction
+        const transaction = await db.sequelize.transaction();
+
+        try {
+            // First, set tripclientid to null for any beacons associated with this tripclient
+            await db.beacons.update(
+                { tripclientid: null },
+                {
+                    where: { tripclientid: tripClientId },
+                    transaction: transaction
+                }
+            );
+
+            // Then, proceed with deleting the tripclient
+            const result = await db.tripClients.destroy({
+                where: {
+                    trip_group_id: groupId,
+                    tripclientid: tripClientId // Adjust the column names to match your schema if necessary
+                },
+                transaction: transaction
+            });
+
+            if (result === 1) {
+                // If the delete operation was successful, commit the transaction
+                await transaction.commit();
+                res.send({
+                    message: "Client was removed successfully from the group."
+                });
+            } else {
+                // If no rows were deleted, roll back the transaction
+                await transaction.rollback();
+                res.send({
+                    message: `Cannot remove Client with tripClientId=${tripClientId} from Group with id=${groupId}. Maybe Client was not found!`
+                });
+            }
+        } catch (error) {
+            // If any error occurs, roll back the transaction
+            await transaction.rollback();
+            res.status(500).send({
+                message: "Error removing Client with tripClientId=" + tripClientId + " from Group with id=" + groupId
+            });
+        }
+    } catch (error) {
+        res.status(500).send({
+            message: "Transaction error on removing Client with tripClientId=" + tripClientId + " from Group with id=" + groupId
+        });
+    }
+};
+
+
 // Fetch guides from the database (jobid 2 for guides)
 exports.fetchGuides = (req, res) => {
     Staff.findAll({
