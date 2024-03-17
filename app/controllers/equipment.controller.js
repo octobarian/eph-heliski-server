@@ -176,4 +176,67 @@ exports.assignBeaconToTripClient = async (req, res) => {
 };
 
 
+// HELICOPTER ITEMS
+const Helicopter = db.helicopters;
+
+exports.createHelicopter = async (req, res) => {
+    try {
+        const { fuelamounttotal, weight, model, callsign, maxweight } = req.body;
+        const helicopter = await Helicopter.create({
+            fuelamounttotal,
+            weight,
+            model,
+            callsign,
+            maxweight,
+        });
+        res.send(helicopter);
+    } catch (err) {
+        res.status(500).send({ message: err.message || "Some error occurred while creating the Helicopter." });
+    }
+};
+
+exports.deleteHelicopter = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const num = await Helicopter.destroy({ where: { helicopterid: id } });
+        if (num == 1) {
+            res.send({ message: "Helicopter was deleted successfully!" });
+        } else {
+            res.send({ message: `Cannot delete Helicopter with id=${id}. Maybe Helicopter was not found!` });
+        }
+    } catch (err) {
+        res.status(500).send({ message: "Could not delete Helicopter with id=" + id });
+    }
+};
+
+exports.editHelicopter = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { fuelamounttotal, weight, model, callsign, maxweight } = req.body;
+        const num = await Helicopter.update({ 
+            fuelamounttotal,
+            weight,
+            model,
+            callsign,
+            maxweight,
+        }, { where: { helicopterid: id } });
+
+        if (num == 1) {
+            res.send({ message: "Helicopter was updated successfully." });
+        } else {
+            res.send({ message: `Cannot update Helicopter with id=${id}. Maybe Helicopter was not found or req.body is empty!` });
+        }
+    } catch (err) {
+        res.status(500).send({ message: "Error updating Helicopter with id=" + id });
+    }
+};
+
+exports.getHelicopters = async (req, res) => {
+    try {
+        const helicopters = await Helicopter.findAll();
+        res.send(helicopters);
+    } catch (err) {
+        res.status(500).send({ message: err.message || "Some error occurred while retrieving helicopters." });
+    }
+};
 

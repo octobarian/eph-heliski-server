@@ -37,7 +37,9 @@ module.exports = app => {
     // Retrieve the trip for a guide, based on staffid and the date selected
     router.get('/findByGuideAndDate/:staffId/:date', trips.findByGuideAndDate);
 
-    router.post("/assign", trips.assignReservationToTrip);
+    router.get('/findgroups/:tripId', trips.fetchGroupsForTrip);
+
+    router.post("/assign", trips.assignReservationToTripGroup);
 
     router.post('/removereservation', trips.removeReservationFromTrip);
 

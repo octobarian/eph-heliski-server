@@ -3,6 +3,7 @@ module.exports = app => {
 
     var router = require("express").Router();
 
+    //BEACONS
     // Create a new Beacon
     router.post("/beacon", equipment.createBeacon);
 
@@ -25,6 +26,20 @@ module.exports = app => {
 
     // Assign a Beacon to a trip client
     router.put("/beacon/assign/:beaconId", equipment.assignBeaconToTripClient);
+
+
+    //HELICOPTERS
+    // Create a new Helicopter
+    router.post("/helicopter", equipment.createHelicopter);
+
+    // Retrieve all Helicopters
+    router.get("/helicopter", equipment.getHelicopters);
+
+    // Delete a Helicopter with id
+    router.delete("/helicopter/:id", equipment.deleteHelicopter);
+
+    // Edit a Helicopter with id
+    router.put("/helicopter/:id", equipment.editHelicopter);
 
 
     app.use('/api/equipment', router);

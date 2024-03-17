@@ -118,40 +118,25 @@ exports.create = (req, res) => {
 
 exports.updateTrip = async (req, res) => {
     const tripId = req.params.id;
-    const { pilotid, helicopterid, guideIds } = req.body;
+    let { pilotid, helicopterid } = req.body;
 
+    // Check if pilotid or helicopterid are undefined or empty and set them to null
+    pilotid = pilotid ? pilotid : null;
+    helicopterid = helicopterid ? helicopterid : null;
+
+    console.log("tripid:"+tripId+"  pilotId:"+pilotid+"  helicopterid"+helicopterid);
     try {
         // Start a transaction
         const transaction = await db.sequelize.transaction();
-
         try {
             // Update the trip details
-            const result = await db.trips.update(
-                { pilotid, helicopterid }, // Assuming these are the only fields to update
+            const result = await Trip.update(
+                { pilotid, helicopterid }, // Updated fields
                 { 
                     where: { tripid: tripId },
                     transaction: transaction
                 }
             );
-
-            console.log("Update result:", result);
-
-            // Delete existing guides for this trip
-            await db.tripStaff.destroy({
-                where: { 
-                    tripid: tripId,
-                    staffid: guideIds.length > 0 ? { [db.Sequelize.Op.in]: guideIds } : { [db.Sequelize.Op.not]: null } 
-                },
-                transaction
-            });
-
-            // Create new tripStaff entries for guides
-            const newGuides = guideIds.map(guideId => ({
-                tripid: tripId,
-                staffid: guideId // Ensure these are staff IDs
-            }));
-            await db.tripStaff.bulkCreate(newGuides, { transaction });
-
             // Commit the transaction
             await transaction.commit();
             res.send({ message: "Trip updated successfully." });
@@ -169,6 +154,7 @@ exports.updateTrip = async (req, res) => {
         });
     }
 };
+
 
 // Remove a client from a group (used in Greeting-Office.vue)
 exports.removeClientFromGroup = async (req, res) => {
@@ -553,34 +539,48 @@ exports.findByDate = (req, res) => {
     
 };
 
-// Delete a group and its associated clients
 exports.deleteGroup = async (req, res) => {
     const groupId = req.params.groupId;
-  
+
     try {
         // Start a transaction
         const transaction = await db.sequelize.transaction();
 
         try {
-            // Delete associated TripClients first
+            // Step 1: Retrieve all TripClients for the group
+            const tripClients = await TripClient.findAll({
+                where: { trip_group_id: groupId },
+                transaction
+            });
+
+            // Step 2: For each TripClient, nullify the beacon's tripclientid if it exists
+            for (let tripClient of tripClients) {
+                await db.beacons.update(
+                    { tripclientid: null },
+                    {
+                        where: { tripclientid: tripClient.tripclientid },
+                        transaction
+                    }
+                );
+            }
+
+            // Step 3: Delete all TripClients now that beacons have been detached
             await TripClient.destroy({
                 where: { trip_group_id: groupId },
                 transaction
             });
 
-            // Then, delete the TripGroup
+            // Finally, delete the TripGroup itself
             await TripGroup.destroy({
                 where: { trip_group_id: groupId },
                 transaction
             });
 
-            // If everything went fine, commit the transaction
+            // Commit the transaction
             await transaction.commit();
-            res.send({
-                message: "Group and its clients were deleted successfully!"
-            });
+            res.send({ message: "Group and its clients were deleted successfully!" });
         } catch (error) {
-            // If an error occurs, rollback the transaction
+            // Rollback the transaction in case of an error
             await transaction.rollback();
             console.error("Error during group deletion transaction:", error);
             res.status(500).send({
@@ -594,6 +594,8 @@ exports.deleteGroup = async (req, res) => {
         });
     }
 };
+
+
 
 exports.createGroup = async (req, res) => {
     const tripId = req.params.tripId; // or req.body.tripId depending on how you're passing it
@@ -618,8 +620,23 @@ exports.createGroup = async (req, res) => {
     }
 };
 
-
-
+exports.fetchGroupsForTrip = async (req, res) => {
+    const { tripId } = req.params;
+  
+    try {
+      const groups = await TripGroup.findAll({
+        where: { trip_id: tripId },
+        attributes: ['trip_group_id']
+      });
+  
+      res.send(groups);
+    } catch (error) {
+      res.status(500).send({
+        message: "Error retrieving groups for tripId=" + tripId
+      });
+    }
+  };
+  
 
 exports.findByGuideAndDate = (req, res) => {
     const staffId = req.params.staffId;
@@ -731,8 +748,8 @@ exports.findByGuideAndDate = (req, res) => {
 
 
 
-exports.assignReservationToTrip = async (req, res) => {
-    const { tripId, reservationId, personId} = req.body;
+exports.assignReservationToTripGroup = async (req, res) => {
+    const { tripId, groupId, reservationId, personId} = req.body;
 
     try {
         const clientId = await translatePersonIdToClientId(personId);
@@ -743,6 +760,7 @@ exports.assignReservationToTrip = async (req, res) => {
         // Logic to link reservation to trip in TripClient table
         await db.tripClients.create({
             tripid: tripId,
+            trip_group_id: groupId,
             reservationid: reservationId,
             clientid: clientId
             // clientid can be added if needed
