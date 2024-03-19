@@ -53,16 +53,29 @@ exports.create = async (req, res) => {
 };
 
 exports.findAll = (req, res) => {
-    Client.findAll({
+    let { page, pageSize } = req.query;
+    page = page ? parseInt(page, 10) : 1;
+    pageSize = pageSize ? parseInt(pageSize, 10) : 50; // Default page size to 50 if not provided
+
+    Client.findAndCountAll({
         include: [{
             model: Person,
             as: 'person',
             attributes: ['personid', 'firstname', 'lastname', 'mobilephone', 'email', 'country', 'dateofbirth', 'weight', 'isplaceholder']
         }],
-        attributes: ['clientid', 'personid', 'isplaceholder']
+        attributes: ['clientid', 'personid', 'isplaceholder'],
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        order: [['personid', 'ASC']] // Example ordering, adjust as needed
     })
     .then(data => {
-        res.send(data);
+        const response = {
+            totalItems: data.count,
+            clients: data.rows,
+            totalPages: Math.ceil(data.count / pageSize),
+            currentPage: page
+        };
+        res.send(response);
     })
     .catch(err => {
         console.error("Error: ", err);
@@ -71,6 +84,7 @@ exports.findAll = (req, res) => {
         });
     });
 };
+
 
 exports.findOne = (req, res) => {
     const id = req.params.id;
@@ -109,7 +123,13 @@ exports.findOne = (req, res) => {
                             'isplaceholder',
                             'description'
                         ]
-                    }
+                        
+                    },
+                    {
+                        model: db.personCustomFields, // Assuming this is your model name
+                        as: 'customFields', // This alias should match the one defined in your Sequelize associations
+                        attributes: ['field_name', 'field_value']
+                    },
                 ]
             }
         ],
@@ -133,38 +153,46 @@ exports.findOne = (req, res) => {
 };
 
 
-// Find Clients by Name
 exports.findByName = (req, res) => {
     const name = req.query.name;
-    Client.findAll({
-      include: [{
-        model: Person,
-        as: 'person',
-        where: {
-          [Op.or]: [
-            { firstname: { [Op.iLike]: `%${name}%` } }, // Ensure the field name is lowercase
-            { lastname: { [Op.iLike]: `%${name}%` } }   // Ensure the field name is lowercase
-          ]
-        }
-      }]
+    let { page, pageSize } = req.query;
+    page = page ? parseInt(page, 10) : 1;
+    pageSize = pageSize ? parseInt(pageSize, 10) : 50; // Default page size to 50 if not provided
+
+    Client.findAndCountAll({
+        include: [{
+            model: Person,
+            as: 'person',
+            where: {
+                [Op.or]: [
+                    { firstname: { [Op.iLike]: `%${name}%` } },
+                    { lastname: { [Op.iLike]: `%${name}%` } }
+                ]
+            },
+            attributes: ['personid', 'firstname', 'lastname', 'mobilephone', 'email', 'country', 'dateofbirth', 'weight', 'isplaceholder']
+        }],
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        order: [['personid', 'ASC']] // Example ordering, adjust as needed
     })
     .then(data => {
-      if (data) {
-        res.send(data);
-      } else {
-        // If no data is found, send an empty array
-        res.send([]);
-      }
+        const response = {
+            totalItems: data.count,
+            clients: data.rows,
+            totalPages: Math.ceil(data.count / pageSize),
+            currentPage: page
+        };
+        res.send(response);
     })
     .catch(err => {
-      console.error("Error: ", err);
-      // Send back the actual error message for debugging purposes, or log it instead
-      res.status(500).send({
-        message: "Error retrieving Clients with name=" + name,
-        error: err.message
-      });
+        console.error("Error: ", err);
+        res.status(500).send({
+            message: "Error retrieving Clients with name=" + name,
+            error: err.message
+        });
     });
 };
+
 
   
 

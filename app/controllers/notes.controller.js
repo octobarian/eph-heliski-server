@@ -20,12 +20,15 @@ exports.createNote = (req, res) => {
 
     // Save Note in the database
     Note.create(note)
-        .then(noteData => {
+        .then(data => {
             // Handle different types of notes
             switch (req.body.type) {
                 case 'tripnote':
                     // Link the created note to the trip
-                    return Trip.update({ noteid: noteData.noteid }, { where: { tripid: req.body.itemid } });
+                    return Trip.update({ noteid: data.noteid }, { where: { tripid: req.body.itemid } })
+                        .then(() => {
+                            return data; // Return the note data after linking it
+                        });
                 case 'beaconnote':
                     // Future implementation for beacon note
                     break;
@@ -42,7 +45,7 @@ exports.createNote = (req, res) => {
                     throw new Error("Invalid note type");
             }
         })
-        .then(() => {
+        .then((noteData) => {
             res.send(noteData); // Send the created note data as response
         })
         .catch(err => {
@@ -90,8 +93,9 @@ exports.findOne = (req, res) => {
 
 // Retrieve a note associated with a given trip ID
 exports.getTripNote = (req, res) => {
-    const tripId = req.params.tripid;
+    const tripId = req.params.tripId;
 
+    console.log("FOUND TRIPID:"+tripId)
     Trip.findByPk(tripId, {
         include: [{
             model: Note,

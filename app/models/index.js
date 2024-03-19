@@ -25,6 +25,7 @@ db.sequelize = sequelize;
 db.tutorials = require("./tutorial.model.js")(sequelize, Sequelize);
 db.clients = require("./client.model.js")(sequelize, Sequelize); 
 db.persons = require("./person.model.js")(sequelize, Sequelize); 
+db.personCustomFields = require("./personCustomFields.model.js")(sequelize, Sequelize);
 
 // Import models for the Health tables
 db.personhealth = require("./personHealth.model.js")(sequelize, Sequelize);
@@ -68,6 +69,9 @@ db.personhealth.belongsTo(db.healthrecordvalues, { foreignKey: 'healthrecordvalu
 db.personhealth.belongsTo(db.healthseverities, { foreignKey: 'severityid', as: 'severity' });
 // Associate healthRecord Value with Recordtypes
 db.healthrecordvalues.belongsTo(db.healthrecordtypes, { foreignKey: 'healthrecordtypeid', as: 'healthrecordtype' });
+// Associating Customvalues to person
+db.persons.hasMany(db.personCustomFields, { foreignKey: 'personid', as: 'customFields' });
+db.personCustomFields.belongsTo(db.persons, { foreignKey: 'personid', as: 'person' });
 
 // client Relation 
 db.clients.belongsTo(db.persons, { foreignKey: 'personid', as: 'person' });

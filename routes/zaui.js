@@ -166,14 +166,132 @@ router.get("/get-date-manifest", (req, res) => {
     });
 });
 
-// Map the Zaui manifest received into db 
+// OLD MAPPING CODE:
+// // Map the Zaui manifest received into db 
+// async function mapManifestToDBSchema(manifestData) {
+//   const activitiesData = manifestData.response.methodResponse.activities.activity;
+
+//   // Process each activity
+//   try {
+//     const results = await Promise.all(activitiesData.map(async (activityData) => {
+//       // Find or create the activity
+//       const [activity, _] = await db.activities.findOrCreate({
+//         where: {
+//           zauiactivityid: activityData.activityId,
+//           activityname: activityData.activityName
+//         },
+//         defaults: {
+//           zauiactivityid: activityData.activityId,
+//           activityname: activityData.activityName
+//         }
+//       });
+
+//       // Process each booking within the activity
+//       let bookings = Array.isArray(activityData.allBookings.booking) ? activityData.allBookings.booking : [activityData.allBookings.booking];
+
+//       const bookingPromises = bookings.map(async (booking, index) => {
+//         try {
+//           return await db.sequelize.transaction(async (transaction) => {
+//             console.log(`Processing Booking ${index + 1}:`, booking);
+
+//             // Check for existing person or create a new one
+//             const [person, personCreated] = await db.persons.findOrCreate({
+//               where: {
+//                 email: booking.email,
+//                 firstname: booking.guestFirstName,
+//                 lastname: booking.guestLastName
+//               },
+//               defaults: {
+//                 firstname: booking.guestFirstName,
+//                 lastname: booking.guestLastName,
+//                 mobilephone: booking.mobile && typeof booking.mobile === 'string' ? booking.mobile.replace(/[^0-9]/g, '') : 9999999999
+//                 // ... other person fields
+//               },
+//               transaction
+//             });
+
+//             console.log(`Person ${personCreated ? 'created' : 'found'}:`, person);
+
+//             let client;
+//             if (personCreated) {
+//               client = await db.clients.create({ personid: person.personid }, { transaction });
+
+//               // Fetch additional details from Zaui
+//               const guestProfile = await getGuestProfile(booking);
+//               if (guestProfile.methodErrorCode != '99' && guestProfile.response.methodResponse.guestDetails) {
+//                 const guestDetails = guestProfile.response.methodResponse.guestDetails;
+
+//                 let country;
+//                 if (guestDetails.country && typeof guestDetails.country === 'string') {
+//                   country = guestDetails.country;
+//                 } else if (Array.isArray(guestDetails.country) && guestDetails.country.length > 0) {
+//                   country = guestDetails.country[0];
+//                 } else {
+//                   country = 'no country';
+//                 }
+
+//                 const weightField = guestDetails.userCustomFields && guestDetails.userCustomFields.customField.find(field => field.customFieldLabel === 'Weight');
+//                 const weight = weightField ? parseInt(weightField.customFieldValue.replace(/[^\d]/g, '')) : 999;
+
+//                 await db.persons.update(
+//                   {
+//                     dateofbirth: guestDetails.birthDate,
+//                     weight: weight,
+//                     country: country
+//                   },
+//                   { where: { personid: person.personid }, transaction }
+//                 );
+//               }
+//             } else {
+//               client = await db.clients.findOne({ where: { personid: person.personid }, transaction });
+//             }
+
+//             console.log('Client:', client);
+
+//             const [reservation, reservationCreated] = await db.reservation.findOrCreate({
+//               where: { zauireservationid: booking.bookingNumber },
+//               defaults: {
+//                 personid: person.personid,
+//                 activitydate: manifestData.response.methodResponse.manifestDate,
+//                 balanceowing: booking.outstandingBalance,
+//                 zauireservationid: booking.bookingNumber,
+//                 activityid: activity.activityid
+//               },
+//               transaction
+//             });
+
+//             console.log(`Reservation ${reservationCreated ? 'created' : 'found'}:`, reservation);
+
+//             // Create ReservationDetail linked to the reservation
+//             await db.reservationDetails.create({
+//               reservationid: reservation.reservationid,
+//               activityid: activity.activityid,
+//               // Add other relevant fields and defaults for reservationDetails here
+//             }, { transaction });
+
+//             return { person, client, reservation };
+//           });
+//         } catch (error) {
+//           console.error("Error processing booking:", error);
+//           return null;
+//         }
+//       });
+
+//       return Promise.all(bookingPromises);
+//     }));
+
+//     return results.flat();
+//   } catch (error) {
+//     console.error("Error in processing all activities and bookings:", error);
+//     return [];
+//   }
+// }
+
 async function mapManifestToDBSchema(manifestData) {
   const activitiesData = manifestData.response.methodResponse.activities.activity;
 
-  // Process each activity
   try {
     const results = await Promise.all(activitiesData.map(async (activityData) => {
-      // Find or create the activity
       const [activity, _] = await db.activities.findOrCreate({
         where: {
           zauiactivityid: activityData.activityId,
@@ -185,95 +303,84 @@ async function mapManifestToDBSchema(manifestData) {
         }
       });
 
-      // Process each booking within the activity
       let bookings = Array.isArray(activityData.allBookings.booking) ? activityData.allBookings.booking : [activityData.allBookings.booking];
 
       const bookingPromises = bookings.map(async (booking, index) => {
-        try {
-          return await db.sequelize.transaction(async (transaction) => {
-            console.log(`Processing Booking ${index + 1}:`, booking);
+        return await db.sequelize.transaction(async (transaction) => {
+          console.log(`Processing Booking ${index + 1}:`, booking);
 
-            // Check for existing person or create a new one
-            const [person, personCreated] = await db.persons.findOrCreate({
-              where: {
-                email: booking.email,
-                firstname: booking.guestFirstName,
-                lastname: booking.guestLastName
-              },
-              defaults: {
-                firstname: booking.guestFirstName,
-                lastname: booking.guestLastName,
-                mobilephone: booking.mobile && typeof booking.mobile === 'string' ? booking.mobile.replace(/[^0-9]/g, '') : 9999999999
-                // ... other person fields
-              },
-              transaction
-            });
-
-            console.log(`Person ${personCreated ? 'created' : 'found'}:`, person);
-
-            let client;
-            if (personCreated) {
-              client = await db.clients.create({ personid: person.personid }, { transaction });
-
-              // Fetch additional details from Zaui
-              const guestProfile = await getGuestProfile(booking);
-              if (guestProfile.methodErrorCode != '99' && guestProfile.response.methodResponse.guestDetails) {
-                const guestDetails = guestProfile.response.methodResponse.guestDetails;
-
-                let country;
-                if (guestDetails.country && typeof guestDetails.country === 'string') {
-                  country = guestDetails.country;
-                } else if (Array.isArray(guestDetails.country) && guestDetails.country.length > 0) {
-                  country = guestDetails.country[0];
-                } else {
-                  country = 'no country';
-                }
-
-                const weightField = guestDetails.userCustomFields && guestDetails.userCustomFields.customField.find(field => field.customFieldLabel === 'Weight');
-                const weight = weightField ? parseInt(weightField.customFieldValue.replace(/[^\d]/g, '')) : 999;
-
-                await db.persons.update(
-                  {
-                    dateofbirth: guestDetails.birthDate,
-                    weight: weight,
-                    country: country
-                  },
-                  { where: { personid: person.personid }, transaction }
-                );
-              }
-            } else {
-              client = await db.clients.findOne({ where: { personid: person.personid }, transaction });
-            }
-
-            console.log('Client:', client);
-
-            const [reservation, reservationCreated] = await db.reservation.findOrCreate({
-              where: { zauireservationid: booking.bookingNumber },
-              defaults: {
-                personid: person.personid,
-                activitydate: manifestData.response.methodResponse.manifestDate,
-                balanceowing: booking.outstandingBalance,
-                zauireservationid: booking.bookingNumber,
-                activityid: activity.activityid
-              },
-              transaction
-            });
-
-            console.log(`Reservation ${reservationCreated ? 'created' : 'found'}:`, reservation);
-
-            // Create ReservationDetail linked to the reservation
-            await db.reservationDetails.create({
-              reservationid: reservation.reservationid,
-              activityid: activity.activityid,
-              // Add other relevant fields and defaults for reservationDetails here
-            }, { transaction });
-
-            return { person, client, reservation };
+          const [person, personCreated] = await db.persons.findOrCreate({
+            where: {
+              email: booking.email,
+              firstname: booking.guestFirstName,
+              lastname: booking.guestLastName
+            },
+            defaults: {
+              firstname: booking.guestFirstName,
+              lastname: booking.guestLastName,
+              mobilephone: booking.mobile && typeof booking.mobile === 'string' ? booking.mobile.replace(/[^0-9]/g, '') : 9999999999
+              // other person fields
+            },
+            transaction
           });
-        } catch (error) {
+
+          console.log(`Person ${personCreated ? 'created' : 'found'}:`, person);
+
+          let client = personCreated ? 
+                       await db.clients.create({ personid: person.personid }, { transaction }) : 
+                       await db.clients.findOne({ where: { personid: person.personid }, transaction });
+
+          console.log('Client:', client);
+
+          // Handle Custom Fields
+          const guestProfile = await getGuestProfile(booking);
+          if (guestProfile && guestProfile.response.methodResponse.guestDetails && guestProfile.response.methodResponse.guestDetails.userCustomFields) {
+            for (const field of guestProfile.response.methodResponse.guestDetails.userCustomFields.customField) {
+              const fieldValue = typeof field.customFieldValue === 'object' ? JSON.stringify(field.customFieldValue) : field.customFieldValue;
+              const [customField, created] = await db.personCustomFields.findOrCreate({
+                where: {
+                  personid: person.personid,
+                  field_name: field.customFieldLabel
+                },
+                defaults: {
+                  field_value: fieldValue
+                },
+                transaction
+              });
+
+              if (!created) {
+                await customField.update({
+                  field_value: fieldValue
+                }, { transaction });
+              }
+            }
+          }
+
+          const [reservation, reservationCreated] = await db.reservation.findOrCreate({
+            where: { zauireservationid: booking.bookingNumber },
+            defaults: {
+              personid: person.personid,
+              activitydate: activityData.activityDate,
+              balanceowing: booking.outstandingBalance,
+              zauireservationid: booking.bookingNumber,
+              activityid: activity.activityid
+            },
+            transaction
+          });
+
+          console.log(`Reservation ${reservationCreated ? 'created' : 'found'}:`, reservation);
+
+          await db.reservationDetails.create({
+            reservationid: reservation.reservationid,
+            activityid: activity.activityid,
+            // Add other relevant fields and defaults for reservationDetails here
+          }, { transaction });
+
+          return { person, client, reservation };
+        }).catch(error => {
           console.error("Error processing booking:", error);
           return null;
-        }
+        });
       });
 
       return Promise.all(bookingPromises);
@@ -285,8 +392,6 @@ async function mapManifestToDBSchema(manifestData) {
     return [];
   }
 }
-
-
 
 
 async function getGuestProfile(booking) {
@@ -306,6 +411,7 @@ async function getGuestProfile(booking) {
     };
 
     const response = await axios.post(zauiUrl, requestData, config);
+    console.log(response.data);
     return response.data;
   } catch (error) {
     console.error("Error fetching guest details from Zaui:", error);
@@ -314,7 +420,15 @@ async function getGuestProfile(booking) {
 }
 
 
-
+router.post("/get-guest-profile-by-booking", async (req, res) => {
+  try {
+    const bookingData = req.body;
+    const profile = await getGuestProfile(bookingData);
+    res.json(profile);
+  } catch (error) {
+    res.status(500).send({ message: error.message });
+  }
+});
 
 
 
