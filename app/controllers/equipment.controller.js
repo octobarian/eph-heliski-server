@@ -139,11 +139,8 @@ exports.unlinkBeaconFromTrip = async (req, res) => {
 };
 
 exports.assignBeaconToTripClient = async (req, res) => {
-    console.log(req);
-    console.log(res);
     const { beaconId } = req.params;
     const { tripClientId } = req.body; // Ensure tripClientId is sent in the body
-    console.log('Trying to find Beaconid:'+beaconId+' tripclientid:'+tripClientId);
 
     try {
         // Check if beacon is already assigned

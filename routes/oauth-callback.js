@@ -8,7 +8,7 @@ const config = {
     "Content-Type": "application/x-www-form-urlencoded",
   },
 };
-const url = `http://localhost:${process.env.FUSIONAUTH_PORT}/oauth2/token`;
+const url = `http://${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/oauth2/token`;
 
 router.get("/", (req, res) => {
 // State from Server

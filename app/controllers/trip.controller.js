@@ -1,4 +1,5 @@
 const db = require("../models");
+const { Sequelize, Op } = require('sequelize');
 
 //db imports
 const Trip = db.trips;
@@ -87,6 +88,8 @@ exports.create = (req, res) => {
     // Create a Trip with default properties
     const trip = {
         date: req.body.date,
+        start_date: req.body.date, 
+        end_date: req.body.date,
         pilotid: null,
         totalvertical: null,
         helicopterid: null,
@@ -118,39 +121,78 @@ exports.create = (req, res) => {
 
 exports.updateTrip = async (req, res) => {
     const tripId = req.params.id;
-    let { pilotid, helicopterid } = req.body;
+    let { pilotid, helicopterid, start_date, end_date } = req.body;
 
     // Check if pilotid or helicopterid are undefined or empty and set them to null
     pilotid = pilotid ? pilotid : null;
     helicopterid = helicopterid ? helicopterid : null;
 
-    console.log("tripid:"+tripId+"  pilotId:"+pilotid+"  helicopterid"+helicopterid);
+    // Prepare the update object
+    let updateObj = { pilotid, helicopterid };
+
+    // Conditionally add start_date and end_date to the update object if they are provided
+    if (start_date) updateObj.start_date = start_date;
+    if (end_date) updateObj.end_date = end_date;
+
+    console.log("Updating trip ID:", tripId, "  Pilot ID:", pilotid, "  Helicopter ID:", helicopterid, "  Start Date:", start_date, "  End Date:", end_date);
+
     try {
         // Start a transaction
         const transaction = await db.sequelize.transaction();
         try {
-            // Update the trip details
-            const result = await Trip.update(
-                { pilotid, helicopterid }, // Updated fields
-                { 
-                    where: { tripid: tripId },
-                    transaction: transaction
-                }
-            );
+            // Update the trip details with the update object
+            const result = await Trip.update(updateObj, {
+                where: { tripid: tripId },
+                transaction: transaction
+            });
             // Commit the transaction
             await transaction.commit();
             res.send({ message: "Trip updated successfully." });
         } catch (error) {
             // Rollback the transaction in case of an error
             await transaction.rollback();
-            console.error("Error during transaction:", error); 
+            console.error("Error during transaction:", error);
             res.status(500).send({
                 message: "Error updating trip with id=" + tripId + ". Details: " + error.message
             });
         }
     } catch (error) {
+        console.error("Error initiating transaction for trip update:", error);
         res.status(500).send({
             message: "Error initiating transaction for updating trip with id=" + tripId
+        });
+    }
+};
+
+exports.updateGroupDate = async (req, res) => {
+    const { groupId, tripId } = req.params;
+    const { end_date } = req.body;
+
+    try {
+        // Optionally, verify that the groupId belongs to the provided tripId before updating
+        const group = await TripGroup.findByPk(groupId);
+        if (!group || group.trip_id !== parseInt(tripId)) {
+            return res.status(404).send({ message: "Trip group not found or does not belong to the specified trip." });
+        }
+
+        // Update the trip group's end date
+        await TripGroup.update({ end_date }, {
+            where: { trip_group_id: groupId }
+        });
+
+        // Check if the trip's end date needs to be updated
+        const trip = await Trip.findByPk(tripId);
+        if (new Date(end_date) > new Date(trip.end_date)) {
+            await Trip.update({ end_date }, {
+                where: { tripid: tripId }
+            });
+        }
+
+        res.send({ message: "Trip group and, if applicable, trip end date updated successfully." });
+    } catch (error) {
+        console.error("Error updating trip group end date:", error);
+        res.status(500).send({
+            message: "An error occurred while trying to update the trip group's end date."
         });
     }
 };
@@ -291,103 +333,16 @@ exports.fetchHelicopters = (req, res) => {
     });
 };
 
-//OLD WORKING FINDBYDATE
-// exports.findByDate = (req, res) => {
-//     const date = req.params.date;
-
-//     Trip.findAll({
-//         where: { date: date },
-//         include: [
-//             {
-//                 model: Helicopter,
-//                 as: 'helicopter',
-//             },
-//             {
-//                 model: Staff,
-//                 as: 'pilot',
-//                 include: {
-//                     model: Person,
-//                     as: 'person'
-//                 }
-//             },
-//             {
-//                 model: TripStaff,
-//                 as: 'tripStaff',
-//                 include: {
-//                     model: Staff,
-//                     as: 'staff',
-//                     include: [
-//                         {
-//                             model: Person,
-//                             as: 'person'
-//                         },
-//                         {
-//                             model: Job,
-//                             as: 'job'
-//                         }
-//                     ]
-//                 }
-//             },
-//             // Include Reservations associated with the trip
-//             {
-//                 model: db.reservation,
-//                 as: 'reservations',
-//                 include: [
-//                   {
-//                     model: db.persons,
-//                     as: 'person',
-//                     attributes: ['firstname', 'lastname', 'weight'] // Select only required attributes
-//                   }
-//                 ],
-//                 attributes: ['reservationid'],
-//                 through: { attributes: [] } // Exclude the join table attributes
-//             }
-//         ]
-//     })
-//     .then(data => {
-//         const formattedData = data.map(trip => {
-//             // Extract guides, pilot, helicopter, and reservation details
-//             // Extract guides from tripStaff
-//             const guides = trip.tripStaff
-//                 .filter(staffMember => staffMember.staff && staffMember.staff.job && staffMember.staff.job.jobid === 2)
-//                 .map(staffMember => staffMember.staff.person);
-
-// //             // Pilot is directly associated with the trip
-//             const pilot = trip.pilot ? trip.pilot.person : null;
-
-// //             // Extract reservationids associated with the trip
-//             const reservationids = trip.reservations.map(reservation => reservation.reservationid);
-
-//             // Extract reservation details with person info
-//             const reservationPersons = trip.reservations.map(reservation => ({
-//                 reservationid: reservation.reservationid,
-//                 person: reservation.person // This will have firstname, lastname, and weight
-//             }));
-
-//             return {
-//                 ...trip.toJSON(),
-//                 guides: guides,
-//                 pilot: pilot,
-//                 helicopter: trip.helicopter,
-//                 reservationids: reservationids,  // Existing reservation IDs
-//                 reservationPersons: reservationPersons // New object with reservation details including person
-//             };
-//         });
-
-//         res.send(formattedData);
-//     })
-//     .catch(err => {
-//         res.status(500).send({
-//             message: err.message || "Some error occurred while retrieving trips."
-//         });
-//     });
-// };
-
 exports.findByDate = (req, res) => {
     const date = req.params.date;
 
     Trip.findAll({
-        where: { date: date },
+        where: {
+            [Op.and]: [
+                { start_date: { [Op.lte]: date } },
+                { end_date: { [Op.gte]: date } }
+            ]
+        },
         include: [
             //Information contained within a trip: Helicopter, Staff(Pilot), TripStaff->Staff(guide)
             {
@@ -424,6 +379,12 @@ exports.findByDate = (req, res) => {
             {
                 model: TripGroup, 
                 as: 'tripGroups',
+                where: {
+                    [Op.and]: [
+                        { start_date: { [Op.lte]: date } },
+                        { end_date: { [Op.gte]: date } }
+                    ]
+                },
                 include: [
                     {
                         model: TripClient, 
@@ -440,6 +401,13 @@ exports.findByDate = (req, res) => {
                                     }
                                 ],
                                 attributes: ['reservationid'],
+                            },
+                            {
+                                model: db.beacons, 
+                                as: 'beacon', 
+                                attributes: ['beaconid', 'beaconnumber'], 
+                                where: { active: true },
+                                required: false
                             }
                         ],
                         attributes: ['tripclientid']
@@ -453,7 +421,7 @@ exports.findByDate = (req, res) => {
                         }
                     }
                 ],
-                attributes: ['trip_group_id']
+                attributes: ['trip_group_id', 'start_date', 'end_date']
             },
         ]
     })
@@ -498,20 +466,29 @@ exports.findByDate = (req, res) => {
                             weight: client.reservation.person.weight,
                             id: client.reservation.person.personid,
                             age: calculateAge(client.reservation.person.dateofbirth), 
+                        } : null,
+                        beacon: client.beacon ? {
+                            beaconid: client.beacon.beaconid,
+                            beaconnumber: client.beacon.beaconnumber,
                         } : null
-                    };
+                    }; 
                 });
                 
+                console.log("END DATE FOR GROUPL:"+group.end_date);
                 return {
                     groupid: group.trip_group_id?group.trip_group_id:null,
+                    start_date: group.start_date, 
+                    end_date: group.end_date,
                     guide: guide,
-                    clients: clients
+                    clients: clients,
                 };
             });
     
             return {
                 tripId: trip.tripid,
                 date: trip.date,
+                start_date: trip.start_date, 
+                end_date: trip.end_date,
                 totalVertical: trip.totalvertical,
                 pilot: pilot,
                 helicopter: helicopter,
@@ -594,8 +571,6 @@ exports.deleteGroup = async (req, res) => {
         });
     }
 };
-
-
 
 exports.createGroup = async (req, res) => {
     const tripId = req.params.tripId; // or req.body.tripId depending on how you're passing it
@@ -745,8 +720,6 @@ exports.findByGuideAndDate = (req, res) => {
         });
     });
 };
-
-
 
 exports.assignReservationToTripGroup = async (req, res) => {
     const { tripId, groupId, reservationId, personId} = req.body;

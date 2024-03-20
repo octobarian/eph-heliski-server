@@ -17,6 +17,14 @@ module.exports = (sequelize, Sequelize) => {
             type: Sequelize.DATE,
             allowNull: false
         },
+        start_date: {
+            type: Sequelize.DATE,
+            allowNull: false
+        },
+        end_date: {
+            type: Sequelize.DATE,
+            allowNull: false
+        },
         totalvertical: {
             type: Sequelize.INTEGER,
             allowNull: true

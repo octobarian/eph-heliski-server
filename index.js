@@ -7,7 +7,7 @@ const db = require("./app/models");
 
 const bodyParser = require("body-parser");
 
-// dotenv
+// Load the .env variables into the build
 require("dotenv").config();
 
 const app = express();
@@ -22,7 +22,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(session(
   {
-    secret: '1234567890', // TODO:don't use this secret in prod :)
+    secret: process.env.SERVER_SECRET, // TODO:don't use this secret in prod :)
     resave: false,
     saveUninitialized: false,
     cookie: {

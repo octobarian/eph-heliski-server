@@ -13,6 +13,14 @@ module.exports = (sequelize, Sequelize) => {
                 key: 'tripid'
             }
         },
+        start_date: {
+            type: Sequelize.DATE,
+            allowNull: false
+        },
+        end_date: {
+            type: Sequelize.DATE,
+            allowNull: false
+        },
         guide_id: { // Foreign key to 'staff' table
             type: Sequelize.INTEGER,
             allowNull: true,

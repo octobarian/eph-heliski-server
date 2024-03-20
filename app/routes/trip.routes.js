@@ -18,6 +18,8 @@ module.exports = app => {
     router.delete("/group/:groupId", trips.deleteGroup);
     // delete a client from a group
     router.delete('/group/:groupId/tripClient/:tripClientId', trips.removeClientFromGroup);
+    // Update the route to include tripId in the URL path
+    router.put("/groupDate/:tripId/:groupId", trips.updateGroupDate);
 
 
     router.put("/id/:id", trips.updateTrip);
