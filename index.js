@@ -58,6 +58,7 @@ require("./app/routes/trip.routes")(app);
 require("./app/routes/notes.routes")(app);
 require("./app/routes/equipment.routes")(app);
 require("./app/routes/reservation.routes")(app);
+require("./app/routes/reports.routes")(app);
 
 //cron jobs imported
 require("./app/cron/zauistatuscron");

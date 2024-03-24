@@ -13,6 +13,14 @@ module.exports = (sequelize, Sequelize) => {
                 key: 'personid', // 'personid' refers to column name in persons table
             }
         },
+        custom_field_option_id: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'custom_field_options', // This should match the new table's name
+                key: 'id', // Assuming 'id' is the primary key in custom_field_options table
+            }
+        },
         field_name: {
             type: Sequelize.STRING,
             allowNull: false

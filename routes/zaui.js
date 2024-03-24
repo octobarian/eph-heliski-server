@@ -169,11 +169,11 @@ router.get("/get-date-manifest", (req, res) => {
 // OLD MAPPING CODE:
 // // Map the Zaui manifest received into db 
 // async function mapManifestToDBSchema(manifestData) {
-//   const activitiesData = manifestData.response.methodResponse.activities.activity;
+  // const activitiesData = manifestData.response.methodResponse.activities.activity;
 
-//   // Process each activity
-//   try {
-//     const results = await Promise.all(activitiesData.map(async (activityData) => {
+  // // Process each activity
+  // try {
+  //   const results = await Promise.all(activitiesData.map(async (activityData) => {
 //       // Find or create the activity
 //       const [activity, _] = await db.activities.findOrCreate({
 //         where: {
@@ -288,8 +288,11 @@ router.get("/get-date-manifest", (req, res) => {
 // }
 
 async function mapManifestToDBSchema(manifestData) {
-  const activitiesData = manifestData.response.methodResponse.activities.activity;
+  var activitiesData = manifestData.response.methodResponse.activities.activity;
+  var manifestActivityDate = manifestData.response.methodResponse.manifestDate;
+  activitiesData = Array.isArray(activitiesData) ? activitiesData : [activitiesData];
 
+  // Process each activity
   try {
     const results = await Promise.all(activitiesData.map(async (activityData) => {
       const [activity, _] = await db.activities.findOrCreate({
@@ -334,33 +337,86 @@ async function mapManifestToDBSchema(manifestData) {
 
           // Handle Custom Fields
           const guestProfile = await getGuestProfile(booking);
+
+          //OLD GUEST PROFILE MAPPING
+          // if (guestProfile && guestProfile.response.methodResponse.guestDetails && guestProfile.response.methodResponse.guestDetails.userCustomFields) {
+          //   for (const field of guestProfile.response.methodResponse.guestDetails.userCustomFields.customField) {
+          //     const fieldValue = typeof field.customFieldValue === 'object' ? JSON.stringify(field.customFieldValue) : field.customFieldValue;
+          //     const [customField, created] = await db.personCustomFields.findOrCreate({
+          //       where: {
+          //         personid: person.personid,
+          //         field_name: field.customFieldLabel
+          //       },
+          //       defaults: {
+          //         field_value: fieldValue
+          //       },
+          //       transaction
+          //     });
+
+          //     if (!created) {
+          //       await customField.update({
+          //         field_value: fieldValue
+          //       }, { transaction });
+          //     }
+          //   }
+          // }
+
           if (guestProfile && guestProfile.response.methodResponse.guestDetails && guestProfile.response.methodResponse.guestDetails.userCustomFields) {
             for (const field of guestProfile.response.methodResponse.guestDetails.userCustomFields.customField) {
               const fieldValue = typeof field.customFieldValue === 'object' ? JSON.stringify(field.customFieldValue) : field.customFieldValue;
+          
+              let customFieldOption = await db.customFieldOptions.findOne({
+                where: { field_name: field.customFieldLabel }
+              });
+              
+              // If not found, try a "like" search
+              if (!customFieldOption) {
+                customFieldOption = await db.customFieldOptions.findOne({
+                  where: {
+                    field_name: {
+                      [db.Sequelize.Op.like]: `%${field.customFieldLabel}%`
+                    }
+                  }
+                });
+              }
+              
+              // If still not found, create a new customFieldOption
+              if (!customFieldOption) {
+                console.log(`Custom field option not found for label: ${field.customFieldLabel}, creating new.`);
+                customFieldOption = await db.customFieldOptions.create({
+                  field_name: field.customFieldLabel
+                });
+              }
+          
               const [customField, created] = await db.personCustomFields.findOrCreate({
                 where: {
                   personid: person.personid,
-                  field_name: field.customFieldLabel
+                  custom_field_option_id: customFieldOption.id
                 },
                 defaults: {
-                  field_value: fieldValue
+                  field_name: field.customFieldLabel, // Include the field name here
+                  field_value: fieldValue,
+                  custom_field_option_id: customFieldOption.id
                 },
                 transaction
               });
-
+              
               if (!created) {
+                // If the custom field exists, update the field_value (and field_name if needed)
                 await customField.update({
-                  field_value: fieldValue
+                  field_name: field.customFieldLabel, // Optionally update the field name as well
+                  field_value: fieldValue,
+                  custom_field_option_id: customFieldOption.id // This should remain the same but included for completeness
                 }, { transaction });
               }
             }
           }
-
+        
           const [reservation, reservationCreated] = await db.reservation.findOrCreate({
             where: { zauireservationid: booking.bookingNumber },
             defaults: {
               personid: person.personid,
-              activitydate: activityData.activityDate,
+              activitydate: manifestActivityDate || new Date().toISOString().slice(0, 10), //will default to today if theres no activity date
               balanceowing: booking.outstandingBalance,
               zauireservationid: booking.bookingNumber,
               activityid: activity.activityid

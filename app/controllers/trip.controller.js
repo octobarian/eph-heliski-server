@@ -348,6 +348,7 @@ exports.findByDate = (req, res) => {
             {
                 model: Helicopter,
                 as: 'helicopter',
+                required: false
             },
             {
                 model: Staff,
@@ -355,7 +356,8 @@ exports.findByDate = (req, res) => {
                 include: {
                     model: Person,
                     as: 'person'
-                }
+                },
+                required: false
             },
             {
                 model: TripStaff,
@@ -379,6 +381,7 @@ exports.findByDate = (req, res) => {
             {
                 model: TripGroup, 
                 as: 'tripGroups',
+                required: false,
                 where: {
                     [Op.and]: [
                         { start_date: { [Op.lte]: date } },
@@ -583,8 +586,21 @@ exports.createGroup = async (req, res) => {
     }
 
     try {
-        // Assuming sequelize for ORM
-        const newGroup = await TripGroup.create({ trip_id: tripId });
+        // Find the trip by ID to get the start date
+        const trip = await Trip.findByPk(tripId);
+        if (!trip) {
+            return res.status(404).send({
+                message: "Trip not found."
+            });
+        }
+
+        // Create a new group with the start_date and end_date based on the trip's start_date
+        const newGroup = await TripGroup.create({
+            trip_id: tripId,
+            start_date: trip.start_date,
+            end_date: trip.start_date 
+        });
+
         return res.status(201).send(newGroup);
     } catch (error) {
         console.error("Error creating new group:", error);
@@ -594,6 +610,7 @@ exports.createGroup = async (req, res) => {
         });
     }
 };
+
 
 exports.fetchGroupsForTrip = async (req, res) => {
     const { tripId } = req.params;
