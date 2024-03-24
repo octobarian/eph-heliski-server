@@ -46,6 +46,7 @@ db.activities = require('./activities.model.js')(sequelize, Sequelize);
 
 //zaui imports
 db.zauiStatuses = require("./zauiStatus.model.js")(sequelize, Sequelize);
+db.zauiDailyManifest = require("./zauiDailyManifest.model.js")(sequelize, Sequelize);
 
 //Trip Imports
 db.helicopters = require('./helicopter.model.js')(sequelize, Sequelize);
