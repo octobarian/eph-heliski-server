@@ -32,46 +32,39 @@ function calculateAge(dateOfBirthString) {
 //Delete a trip by its ID
 exports.delete = async (req, res) => {
     const id = req.params.id;
-  
+
     try {
         const transaction = await db.sequelize.transaction();
 
-        try {
-            // First, delete entries in the TripClient table
-            await TripClient.destroy({
-                where: { tripid: id },
-                transaction
-            });
+        // Retrieve all groups attached to this trip
+        const groups = await TripGroup.findAll({
+            where: { trip_id: id },
+            transaction
+        });
 
-            // Next, delete the trip
-            const num = await Trip.destroy({
-                where: { tripid: id },
-                transaction
-            });
+        // For each group, call the deleteGroupById function
+        for (let group of groups) {
+            await deleteGroupById(group.trip_group_id, transaction);
+        }
 
-            if (num === 1) {
-                await transaction.commit();
-                res.send({
-                    message: "Trip was deleted successfully!"
-                });
-            } else {
-                await transaction.rollback();
-                res.status(404).send({
-                    message: `Cannot delete Trip with id=${id}. Maybe Trip was not found!`
-                });
-            }
-        } catch (error) {
-            console.error("Error during transaction:", error.message);
+        // Proceed with deleting entries in the TripClient table (if needed) and the trip itself
+        // It's assumed that TripClient entries are now handled within the deleteGroup logic, if applicable
+        const num = await Trip.destroy({
+            where: { tripid: id },
+            transaction
+        });
+
+        if (num === 1) {
+            await transaction.commit();
+            res.send({ message: "Trip was deleted successfully!" });
+        } else {
             await transaction.rollback();
-            res.status(500).send({
-                message: "Could not delete Trip with id=" + id
-            });
+            res.status(404).send({ message: `Cannot delete Trip with id=${id}. Maybe Trip was not found!` });
         }
     } catch (error) {
-        console.error("Transaction error on deleting Trip with id=" + id, error.message); // Log the detailed error
-        res.status(500).send({
-            message: "Transaction error on deleting Trip with id=" + id
-        });
+        console.error("Error during transaction:", error.message);
+        await transaction.rollback();
+        res.status(500).send({ message: "Could not delete Trip with id=" + id });
     }
 };
 
@@ -515,8 +508,6 @@ exports.findByDate = (req, res) => {
             errorDetails: err.message,
         });
     });
-    
-    
 };
 
 exports.deleteGroup = async (req, res) => {
@@ -574,6 +565,31 @@ exports.deleteGroup = async (req, res) => {
         });
     }
 };
+
+async function deleteGroupById(groupId, transaction) {
+    // Group deletion logic extracted from the original deleteGroup function
+    const tripClients = await TripClient.findAll({
+        where: { trip_group_id: groupId },
+        transaction
+    });
+
+    for (let tripClient of tripClients) {
+        await db.beacons.update(
+            { tripclientid: null },
+            { where: { tripclientid: tripClient.tripclientid }, transaction }
+        );
+    }
+
+    await TripClient.destroy({
+        where: { trip_group_id: groupId },
+        transaction
+    });
+
+    await TripGroup.destroy({
+        where: { trip_group_id: groupId },
+        transaction
+    });
+}
 
 exports.createGroup = async (req, res) => {
     const tripId = req.params.tripId; // or req.body.tripId depending on how you're passing it
