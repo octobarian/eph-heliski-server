@@ -28,8 +28,8 @@ jobs:
 
       - name: start FusionAuth
         run: |
-          chmod +x ./fusionauth/bin/startup.sh.
-          /fusionauth/bin/startup.sh
+          chmod +x /fusionauth/bin/startup.sh.
+          ./fusionauth/bin/startup.sh
         shell: bash
           
       - name: Zip artifact for deployment
