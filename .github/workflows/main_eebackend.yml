@@ -23,8 +23,8 @@ jobs:
 
       - name: start fusionauth
         run: |
-          chmod +x ./fusionauth/bin/startup.sh.
-          bash ./fusionauth/bin/startup.sh.
+          chmod +x ./fusionauth/bin/startup.sh
+          bash ./fusionauth/bin/startup.sh
         shell: bash
 
       - name: npm install, build, and test
