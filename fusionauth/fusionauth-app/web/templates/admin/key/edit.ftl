@@ -1,0 +1,16 @@
+[#ftl/]
+[#-- @ftlvariable name="keyId" type="java.util.UUID" --]
+
+[#import "../../_utils/button.ftl" as button/]
+[#import "../../_layouts/admin.ftl" as layout/]
+[#import "../../_utils/panel.ftl" as panel/]
+[#import "_macros.ftl" as keyMacros/]
+
+[@layout.html]
+  [@layout.head/]
+  [@layout.body]
+    [@layout.pageForm action="edit/${keyId}" method="POST" id="key-form" panelTitleKey="" cancelURI="/admin/key/" breadcrumbs={"": "settings", "/admin/key/": "keys", "/admin/key/edit/${keyId}": "edit"}]
+      [@keyMacros.formFields action="edit"/]
+    [/@layout.pageForm]
+  [/@layout.body]
+[/@layout.html]

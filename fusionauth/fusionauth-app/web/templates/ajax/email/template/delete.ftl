@@ -1,0 +1,15 @@
+[#ftl/]
+[#-- @ftlvariable name="emailTemplateId" type="java.util.UUID" --]
+[#-- @ftlvariable name="emailTemplate" type="io.fusionauth.domain.email.EmailTemplate" --]
+[#import "../../../_utils/dialog.ftl" as dialog/]
+[#import "../../../_utils/message.ftl" as message/]
+[#import "../../../_utils/properties.ftl" as properties/]
+[@dialog.confirm action="delete" key="are-you-sure" idField="emailTemplateId"]
+  [@message.showAPIErrorRespones storageKey="io.fusionauth.email.template.delete.errors"/]
+  <fieldset>
+    [@properties.table]
+      [@properties.rowEval nameKey="name" object=emailTemplate!{} propertyName="name"/]
+      [@properties.rowEval nameKey="id" object=emailTemplate!{} propertyName="id"/]
+    [/@properties.table]
+  </fieldset>
+[/@dialog.confirm]
