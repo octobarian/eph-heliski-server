@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright (c) 2020, FusionAuth, All Rights Reserved
+  -->
+<browserconfig><msapplication><tile><square70x70logo src="/images/ms-icon-70x70.png"/><square150x150logo src="/images/ms-icon-150x150.png"/><square144x144logo src="/images/ms-icon-144x144.png"/><wide310x150logo src="/images/ms-icon-310x350.png"/><square310x310logo src="/images/ms-icon-310x310.png"/><TileColor>#ffffff</TileColor></tile></msapplication></browserconfig>

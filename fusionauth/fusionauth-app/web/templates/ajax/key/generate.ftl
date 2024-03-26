@@ -1,0 +1,25 @@
+[#ftl/]
+[#-- @ftlvariable name="defaultIssuer" type="java.lang.String" --]
+[#-- @ftlvariable name="key" type="io.fusionauth.domain.Key" --]
+[#-- @ftlvariable name="type" type="io.fusionauth.domain.Key.KeyType" --]
+
+[#import "../../_utils/button.ftl" as button/]
+[#import "../../_utils/dialog.ftl" as dialog/]
+[#import "../../_utils/locale.ftl" as locale/]
+[#import "../../_utils/message.ftl" as message/]
+[#import "../../_utils/properties.ftl" as properties/]
+
+[@dialog.form action="generate" titleKey="generate-${type?lower_case}" formClass="labels-left full"]
+<fieldset>
+  [@control.hidden name="type"/]
+  [@control.text name="keyId" autocapitalize="none" autocomplete="off" autocorrect="off"  tooltip=function.message('{tooltip}keyId')/]
+  [@control.text name="key.name" autocapitalize="none" autocomplete="off" autocorrect="off" autofocus="autofocus" required=true tooltip=function.message('{tooltip}key.name')/]
+  [#if type != "HMAC"]
+  [@control.text name="key.issuer" autocapitalize="none" autocomplete="off" autocorrect="off" required=false placeholder="${defaultIssuer}" tooltip=function.message('{tooltip}key.issuer')/]
+  [/#if]
+  [@control.select name="key.algorithm" items=algorithms tooltip=function.message('{tooltip}key.algorithm')/]
+  [#if type == "RSA"]
+  [@control.select name="key.length" items=[2048, 3072, 4096] tooltip=function.message('{tooltip}key.length')/]
+  [/#if]
+</fieldset>
+[/@dialog.form]

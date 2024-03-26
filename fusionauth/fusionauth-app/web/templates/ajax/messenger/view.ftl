@@ -1,0 +1,32 @@
+[#ftl/]
+[#-- @ftlvariable name="messenger" type="io.fusionauth.domain.messenger.BaseMessengerConfiguration" --]
+
+[#import "../../_utils/dialog.ftl" as dialog/]
+[#import "../../_utils/message.ftl" as message/]
+[#import "../../_utils/properties.ftl" as properties/]
+
+[@dialog.view]
+  [#-- Common fields --]
+  <h3>[@message.print key="fields"/]</h3>
+  [@properties.table]
+    [@properties.rowEval nameKey="name" object=messenger propertyName="name"/]
+    [@properties.rowEval nameKey="id" object=messenger propertyName="id"/]
+    [@properties.row nameKey="type" value=messenger.getType()/]
+    [@properties.row nameKey="transport" value=messenger.transport/]
+    [@properties.rowEval nameKey="debug" object=messenger propertyName="debug" booleanAsCheckmark=false /]
+    [@properties.rowEval nameKey="insertInstant" object=messenger propertyName="insertInstant"/]
+    [@properties.rowEval nameKey="lastUpdateInstant" object=messenger propertyName="lastUpdateInstant"/]
+  [/@properties.table]
+
+  [#-- Twilio messenger --]
+  [#if messenger.type == "Twilio"]
+    <h3>[@message.print key="twilio-details"/]</h3>
+    [@properties.table]
+      [@properties.rowEval nameKey="twilio.accountSID" object=messenger propertyName="accountSID"/]
+      [@properties.rowEval nameKey="twilio.authToken" object=messenger propertyName="authToken"/]
+      [@properties.rowEval nameKey="twilio.fromPhoneNumber" object=messenger propertyName="fromPhoneNumber"/]
+      [@properties.rowEval nameKey="twilio.messagingServiceSid" object=messenger propertyName="messagingServiceSid"/]
+      [@properties.rowEval nameKey="twilio.url" object=messenger propertyName="url"/]
+    [/@properties.table]
+  [/#if]
+[/@dialog.view]

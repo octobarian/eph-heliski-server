@@ -1,0 +1,10 @@
+[#ftl/]
+[#import "../../_utils/message.ftl" as message/]
+[#-- @ftlvariable name="applications" type="java.util.List<io.fusionauth.domain.Application>" --]
+[#import "../../_utils/dialog.ftl" as dialog/]
+[@dialog.confirm action="resend-email-verification" key="confirm-resend-email-verification" idField="userId"]
+  [#if applications?has_content]
+     <p>[@message.print key="{description}application-template"/]</p>
+    [@control.select name="applicationId" items=applications textExpr="name" valueExpr="id" headerValue="" headerL10n="none-selected-use-tenant-config"  autofocus="autofocus" /]
+  [/#if]
+[/@dialog.confirm]

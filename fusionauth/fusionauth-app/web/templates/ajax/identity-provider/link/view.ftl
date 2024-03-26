@@ -1,0 +1,22 @@
+[#ftl/]
+[#-- @ftlvariable name="identityProvider" type="io.fusionauth.domain.provider.BaseIdentityProvider<?>" --]
+[#-- @ftlvariable name="identityProviderLink" type="io.fusionauth.domain.IdentityProviderLink" --]
+
+[#import "../../../_utils/dialog.ftl" as dialog/]
+[#import "../../../_utils/helpers.ftl" as helpers/]
+[#import "../../../_utils/message.ftl" as message/]
+[#import "../../../_utils/properties.ftl" as properties/]
+
+[@dialog.view]
+  <h3>[@message.print key="fields"/]</h3>
+  [@properties.table]
+    [@properties.rowEval nameKey="userId" object=identityProviderLink propertyName="userId"/]
+    [@properties.row nameKey="tenant" value=helpers.tenantName(identityProviderLink.tenantId)/]
+    [@properties.rowEval nameKey="identityProvider" object=identityProvider propertyName="name"/]
+    [@properties.rowEval nameKey="identityProviderId" object=identityProvider propertyName="id"/]
+    [@properties.rowEval nameKey="displayName" object=identityProviderLink propertyName="displayName"/]
+    [@properties.rowEval nameKey="identityProviderUserId" object=identityProviderLink propertyName="identityProviderUserId"/]
+    [@properties.rowEval nameKey="insertInstant" object=identityProviderLink propertyName="insertInstant"/]
+    [@properties.rowEval nameKey="lastLoginInstant" object=identityProviderLink propertyName="lastLoginInstant"/]
+  [/@properties.table]
+[/@dialog.view]

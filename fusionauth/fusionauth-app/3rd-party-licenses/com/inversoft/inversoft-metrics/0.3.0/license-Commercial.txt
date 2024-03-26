@@ -1,0 +1,1 @@
+This library is licensed under the terms of the Inversoft license for the product it is included in. For example, when this library is included in CleanSpeak, it is licensed under the CleanSpeak license.
