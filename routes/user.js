@@ -8,7 +8,7 @@ router.get("/", (req, res) => {
     if (req.session.token) {
         axios
             .post(
-                `http://${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/oauth2/introspect`,
+                `${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/oauth2/introspect`,
                 qs.stringify({
                     client_id: process.env.FUSIONAUTH_CLIENT_ID,
                     token: req.session.token,
@@ -22,7 +22,7 @@ router.get("/", (req, res) => {
                     // GET request to /registration endpoint
                     axios
                         .get(
-                            `http://${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/api/user/registration/${introspectResponse.sub}/${process.env.FUSIONAUTH_APPLICATION_ID}`,
+                            `${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/api/user/registration/${introspectResponse.sub}/${process.env.FUSIONAUTH_APPLICATION_ID}`,
                             {
                                 headers: {
                                     Authorization: process.env.FUSIONAUTH_API_KEY,

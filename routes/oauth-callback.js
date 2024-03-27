@@ -8,7 +8,7 @@ const config = {
     "Content-Type": "application/x-www-form-urlencoded",
   },
 };
-const url = `http://${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/oauth2/token`;
+const url = `${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/oauth2/token`;
 
 router.get("/", (req, res) => {
 // State from Server
@@ -38,7 +38,7 @@ if (stateFromServer !== req.session.stateValue) {
       req.session.token = result.data.access_token;
       console.log(result)
       //redirect to Vue app
-     res.redirect(process.env.VUE_APP_IP);
+      res.redirect(process.env.VUE_APP_IP+":"+process.env.VUE_APP_PORT);
     })
     .catch((err) => {
       console.error(err);

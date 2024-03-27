@@ -6,7 +6,7 @@ router.post("/", (req, res) => {
   // POST request to /introspect endpoint
   axios
     .post(
-      `http://${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/oauth2/introspect`,
+      `${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/oauth2/introspect`,
       qs.stringify({
         client_id: process.env.FUSIONAUTH_CLIENT_ID,
         token: req.session.token,
@@ -17,7 +17,7 @@ router.post("/", (req, res) => {
     
       // PATCH request to /registration endpoint
       axios.patch(
-        `http://${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/api/user/registration/${introspectResponse.sub}/${process.env.FUSIONAUTH_APPLICATION_ID}`,
+        `${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/api/user/registration/${introspectResponse.sub}/${process.env.FUSIONAUTH_APPLICATION_ID}`,
         {
           registration: {
             data: req.body,
