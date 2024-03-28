@@ -26,9 +26,9 @@ jobs:
           npm install
           npm run build --if-present
 
-      - name: start fusionauth
+      - name: start FusionAuth
         run: |
-          chmod +x ./fusionauth/bin/startup.sh.
+          chmod +x ./fusionauth/bin/startup.sh
           ./fusionauth/bin/startup.sh
         shell: bash
           
