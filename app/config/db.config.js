@@ -1,4 +1,4 @@
-require('dotenv').config(); // Ensure this is at the top to load environment variables
+require('dotenv').config();
 
 module.exports = {
   HOST: process.env.DB_HOST,
@@ -11,5 +11,11 @@ module.exports = {
     min: 0,
     acquire: 30000,
     idle: 10000
+  },
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false // For Azure, you might set this to false to bypass strict CA checks. For production, consider using CA cert.
+    }
   }
 };
