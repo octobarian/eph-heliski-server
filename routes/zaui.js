@@ -156,21 +156,29 @@ router.get("/get-date-manifest", (req, res) => {
     )
     // Assuming this is in an async function
   .then(async (result) => {
+
     try {
       // Awaits the completion of findOrCreate before proceeding
       const [manifestRecord, created] = await db.zauiDailyManifest.findOrCreate({
         where: { manifestdate: date }, // Search condition based on manifest date
         defaults: { response: result.data } // Directly use the JavaScript object
-    });  
+      });  
       
       // If additional operations need to be performed on the newly created record, you can check the 'created' flag
       if (created) {
         console.log('New manifest record created');
       }
-
+      
       const mappedData = mapManifestToDBSchema(result.data);
       // Return the mapped data instead of the raw result
-      res.json(mappedData);
+      if (mappedData[0] == 'error') {
+        console.error('No activities found for the date:', date);
+        return res.status(500).json({ error: "No activities found for the specified date." });
+      } else if(mappedData[0] != 'error') {
+        // Otherwise, return the mapped data
+        res.json(mappedData);
+      }
+      
     } catch (err) {
       console.error('Error getting the manifest from Zaui:', err);
       res.status(500).json({ error: "Failed to get the manifest from the Zaui server" });
@@ -192,11 +200,18 @@ router.post("/check-zaui-mapping", async (req, res) => {
       });
 
       if (!manifest) {
-          console.log(`No manifest found for date: ${date}`);
-          return;
-      } else {console.log(manifest.response.response)}
+        // If no manifest is found for the given date, return a specific message
+        console.log(`No manifest found for date: ${date}`);
+        return res.json([`No manifest found for date: ${date}`]);
+      }  else {console.log(manifest.response.response)}
 
       const activities = manifest.response.response.methodResponse.activities.activity;
+
+      if (!activities) {
+        // If no manifest is found for the given date, return a specific message
+        console.log(`No activities found for date: ${date}`);
+        return res.json([`No activities found for date: ${date}`]);
+      }  else {console.log(manifest.response.response)}
 
       // Step 2: Parse the JSON response and extract booking numbers
       for (const activity of activities) {
@@ -373,10 +388,28 @@ router.post("/check-zaui-mapping", async (req, res) => {
 
 async function mapManifestToDBSchema(manifestData) {
   console.log("BEGIN MAPPING MANIFEST");
+  var processErrors = [];
+    // Check if activities are present
+    if (!manifestData.response.methodResponse.activities || !manifestData.response.methodResponse.activities.activity) {
+      console.log("No activities for the day");
+      processErrors.push('No Activities');
+       // Return a message as an array for consistency
+    }
+
     var activitiesData = manifestData.response.methodResponse.activities.activity;
     var manifestActivityDate = manifestData.response.methodResponse.manifestDate;
-    activitiesData = Array.isArray(activitiesData) ? activitiesData : [activitiesData];
 
+    activitiesData = Array.isArray(activitiesData) ? activitiesData : [activitiesData];
+    // Check if there are actually no activities after normalization
+    if (activitiesData.length === 0) {
+      console.log("No Normalized activities for the day");
+      processErrors.push('No Activities');
+       // Return a message as an array for consistency
+    }
+
+    if(processErrors.length > 0){
+      return processErrors;
+    }
     // Initialize an array to collect all results
     let allResults = [];
 
@@ -547,7 +580,7 @@ async function mapManifestToDBSchema(manifestData) {
           });
         } catch (error) {
           console.error("Error processing booking:", error);
-          return null;
+          return error;
         }
       })();
       // Collect results for each booking
@@ -559,7 +592,7 @@ async function mapManifestToDBSchema(manifestData) {
     return allResults.flat().filter(result => result !== null);
   } catch (error) {
     console.error("Error in processing all activities and bookings:", error);
-    return [];
+    return error;
   }
 }
 
