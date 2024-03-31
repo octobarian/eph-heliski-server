@@ -10,8 +10,7 @@ function checkSecret(req, res, next) {
   const bytes = CryptoJS.AES.decrypt(encryptedClientSecret, process.env.SERVER_ENCRYPTION_KEY);
   const clientSecret = bytes.toString(CryptoJS.enc.Utf8);
 
-  console.log('Client Key:'+clientSecret+' ServerKey:'+process.env.SERVER_SECRET);
-  if (clientSecret !== process.env.SERVER_SECRET) {
+  if (clientSecret !== process.env.SERVER_SECRET_KEY) {
     return res.status(403).send({ message: 'Invalid server secret' });
   }
   next();
