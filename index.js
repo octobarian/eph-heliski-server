@@ -7,6 +7,8 @@ const db = require("./app/models");
 
 const bodyParser = require("body-parser");
 
+const checkSecret = require("./app/middleware/checkSecret.js");
+
 // Load the .env variables into the build
 require("dotenv").config();
 
@@ -42,23 +44,26 @@ db.sequelize.sync()
     console.log("Failed to sync db: " + err.message);
   });
 
+//Middleware
+app.use(checkSecret);
+
 // routes
-app.use('/user', require('./routes/user'))
-app.use('/zaui', require('./routes/zaui'))
+app.use('/user', checkSecret, require('./routes/user'))
+app.use('/zaui', checkSecret, require('./routes/zaui'))
 app.use('/login', require('./routes/login'))
 app.use('/logout', require('./routes/logout'))
 app.use('/oauth-callback', require('./routes/oauth-callback'))
 app.use('/set-user-data', require('./routes/set-user-data'))
 
 //db model routes
-require("./app/routes/tutorial.routes")(app);
-require("./app/routes/client.routes")(app);
-require("./app/routes/staff.routes")(app);
-require("./app/routes/trip.routes")(app);
-require("./app/routes/notes.routes")(app);
-require("./app/routes/equipment.routes")(app);
-require("./app/routes/reservation.routes")(app);
-require("./app/routes/reports.routes")(app);
+require("./app/routes/tutorial.routes")(app, checkSecret);
+require("./app/routes/client.routes")(app, checkSecret);
+require("./app/routes/staff.routes")(app, checkSecret);
+require("./app/routes/trip.routes")(app, checkSecret);
+require("./app/routes/notes.routes")(app, checkSecret);
+require("./app/routes/equipment.routes")(app, checkSecret);
+require("./app/routes/reservation.routes")(app, checkSecret);
+require("./app/routes/reports.routes")(app, checkSecret);
 
 //cron jobs imported
 require("./app/cron/zauistatuscron");
