@@ -25,6 +25,27 @@ jobs:
         run: |
           npm install
           npm run build --if-present
+        env:
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_SECRET: ${{ secrets.SERVER_SECRET }}
+          SERVER_ENCRYPTION_KEY: ${{ secrets.SERVER_ENCRYPTION_KEY }}
+          SERVER_SECRET_KEY: ${{ secrets.SERVER_SECRET_KEY }}
+          VUE_APP_IP: ${{ secrets.VUE_APP_IP }}
+          VUE_APP_PORT: ${{ secrets.VUE_APP_PORT }}
+          TZ: ${{ secrets.TZ }}
+          ZAPI_TOKEN: ${{ secrets.ZAPI_TOKEN }}
+          ZAPI_ACCOUNT_ID: ${{ secrets.ZAPI_ACCOUNT_ID }}
+          ZAPI_USER_ID: ${{ secrets.ZAPI_USER_ID }}
+          ZAPI_URL: ${{ secrets.ZAPI_URL }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_DIALECT: ${{ secrets.DB_DIALECT }}
+          DB_POOL_MAX: ${{ secrets.DB_POOL_MAX }}
+          DB_POOL_MIN: ${{ secrets.DB_POOL_MIN }}
+          DB_POOL_ACQUIRE: ${{ secrets.DB_POOL_ACQUIRE }}
+          DB_POOL_IDLE: ${{ secrets.DB_POOL_IDLE }}
           
       - name: Zip artifact for deployment
         run: zip release.zip ./* -r
