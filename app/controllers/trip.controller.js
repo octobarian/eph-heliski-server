@@ -42,13 +42,26 @@ exports.delete = async (req, res) => {
             transaction
         });
 
-        // For each group, call the deleteGroupById function
-        for (let group of groups) {
-            await deleteGroupById(group.trip_group_id, transaction);
+        // If groups are found, call the deleteGroupById function for each group
+        if (groups && groups.length > 0) {
+            for (let group of groups) {
+                await deleteGroupById(group.groupid, transaction);
+            }
         }
 
-        // Proceed with deleting entries in the TripClient table (if needed) and the trip itself
-        // It's assumed that TripClient entries are now handled within the deleteGroup logic, if applicable
+        // Delete all entries in the TripStaff table associated with this trip
+        await TripStaff.destroy({
+            where: { tripid: id },
+            transaction
+        });
+
+        // Delete all entries in the TripClient table associated with this trip
+        await TripClient.destroy({
+            where: { tripid: id },
+            transaction
+        });
+
+        // Delete the trip itself
         const num = await Trip.destroy({
             where: { tripid: id },
             transaction
@@ -63,7 +76,6 @@ exports.delete = async (req, res) => {
         }
     } catch (error) {
         console.error("Error during transaction:", error.message);
-        await transaction.rollback();
         res.status(500).send({ message: "Could not delete Trip with id=" + id });
     }
 };
@@ -114,7 +126,7 @@ exports.create = (req, res) => {
 
 exports.updateTrip = async (req, res) => {
     const tripId = req.params.id;
-    let { pilotid, helicopterid, start_date, end_date } = req.body;
+    let { pilotid, helicopterid, start_date, end_date, triptype } = req.body;
 
     // Check if pilotid or helicopterid are undefined or empty and set them to null
     pilotid = pilotid ? pilotid : null;
@@ -123,11 +135,12 @@ exports.updateTrip = async (req, res) => {
     // Prepare the update object
     let updateObj = { pilotid, helicopterid };
 
-    // Conditionally add start_date and end_date to the update object if they are provided
+    // Conditionally add start_date, end_date, and tripType to the update object if they are provided
     if (start_date) updateObj.start_date = start_date;
     if (end_date) updateObj.end_date = end_date;
+    if (triptype) updateObj.triptype = triptype;
 
-    console.log("Updating trip ID:", tripId, "  Pilot ID:", pilotid, "  Helicopter ID:", helicopterid, "  Start Date:", start_date, "  End Date:", end_date);
+    console.log("Updating trip ID:", tripId, "  Pilot ID:", pilotid, "  Helicopter ID:", helicopterid, "  Start Date:", start_date, "  End Date:", end_date, "  Trip Type:", triptype);
 
     try {
         // Start a transaction
@@ -156,6 +169,7 @@ exports.updateTrip = async (req, res) => {
         });
     }
 };
+
 
 exports.updateGroupDate = async (req, res) => {
     const { groupId, tripId } = req.params;
@@ -486,6 +500,7 @@ exports.findByDate = (req, res) => {
                 start_date: trip.start_date, 
                 end_date: trip.end_date,
                 totalVertical: trip.totalvertical,
+                triptype: trip.triptype,
                 pilot: pilot,
                 helicopter: helicopter,
                 groups: groups

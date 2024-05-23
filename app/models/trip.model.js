@@ -49,6 +49,10 @@ module.exports = (sequelize, Sequelize) => {
                 key: 'noteid',   // 'noteid' refers to column name in notes table
             }
         },
+        triptype: {
+            type: Sequelize.STRING,
+            allowNull: true
+        }
         // Add any additional fields here as needed
     },{
         tableName: 'trips',

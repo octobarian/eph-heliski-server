@@ -133,7 +133,7 @@ router.get('/zaui-statuses-daily', async (req, res) => {
 
 // get the manifest for a specific date, this includes all activities for one day. automatically maps it to a client, person and reservation if they exist
 // or creates new ones if they dont exist.
-router.get("/get-date-manifest", (req, res) => {
+router.get("/get-date-manifest", async (req, res) => {
   const date = req.query.date; // Get the date from the query string
 
   // Prepare the request payload with the required ZAPI details
@@ -147,47 +147,35 @@ router.get("/get-date-manifest", (req, res) => {
     },
   };
 
-  // Make a POST request to Zaui to get the manifest
-  axios
-    .post(
-      zauiUrl,
-      requestData,
-      config
-    )
-    // Assuming this is in an async function
-  .then(async (result) => {
+  try {
+    // Make a POST request to Zaui to get the manifest
+    const result = await axios.post(zauiUrl, requestData, config);
 
-    try {
-      // Awaits the completion of findOrCreate before proceeding
-      const [manifestRecord, created] = await db.zauiDailyManifest.findOrCreate({
-        where: { manifestdate: date }, // Search condition based on manifest date
-        defaults: { response: result.data } // Directly use the JavaScript object
-      });  
-      
-      // If additional operations need to be performed on the newly created record, you can check the 'created' flag
-      if (created) {
-        console.log('New manifest record created');
-      }
-      
-      const mappedData = mapManifestToDBSchema(result.data);
-      // Return the mapped data instead of the raw result
-      if (mappedData[0] == 'error') {
-        console.error('No activities found for the date:', date);
-        return res.status(500).json({ error: "No activities found for the specified date." });
-      } else if(mappedData[0] != 'error') {
-        // Otherwise, return the mapped data
-        res.json(mappedData);
-      }
-      
-    } catch (err) {
-      console.error('Error getting the manifest from Zaui:', err);
-      res.status(500).json({ error: "Failed to get the manifest from the Zaui server" });
+    // Awaits the completion of findOrCreate before proceeding
+    const [manifestRecord, created] = await db.zauiDailyManifest.findOrCreate({
+      where: { manifestdate: date }, // Search condition based on manifest date
+      defaults: { response: result.data } // Directly use the JavaScript object
+    });
+
+    // If additional operations need to be performed on the newly created record, you can check the 'created' flag
+    if (created) {
+      console.log('New manifest record created');
     }
-  })
-  .catch((err) => {
-    console.error('Error in processing the request:', err);
-    res.status(500).json({ error: "Failed to process the request" });
-  });
+
+    const mappedData = await mapManifestToDBSchema(result.data);
+
+    // Return the mapped data instead of the raw result
+    if (mappedData[0] == 'error') {
+      console.error('No activities found for the date:', date);
+      return res.status(500).json({ error: "No activities found for the specified date." });
+    } else {
+      // Otherwise, return the mapped data
+      res.json(mappedData);
+    }
+  } catch (err) {
+    console.error('Error getting the manifest from Zaui:', err);
+    res.status(500).json({ error: "Failed to get the manifest from the Zaui server" });
+  }
 });
 
 router.post("/check-zaui-mapping", async (req, res) => {
