@@ -9,6 +9,8 @@ const bodyParser = require("body-parser");
 
 const checkSecret = require("./app/middleware/checkSecret.js");
 
+const runMigrations = require('./app/controllers/dbMigrations.js');
+
 // Load the .env variables into the build
 require("dotenv").config();
 
@@ -78,6 +80,9 @@ app.get("/", (req, res) => {
 const port =  process.env.SERVER_PORT || 3000;
 
 // Listen to server  
-app.listen(port, () => {
-  console.log(`Listening on port ${port}`);
-});
+(async () => {
+  await runMigrations(); // Run the migration script
+  app.listen(port, () => {
+    console.log(`Listening on port ${port}`);
+  });
+})();
