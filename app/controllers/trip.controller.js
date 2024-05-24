@@ -11,6 +11,7 @@ const TripClient = db.tripClients;
 const TripGroup = db.tripGroups;
 const Reservation = db.reservation;
 const Job = db.jobs;
+const TripShuttle = db.tripShuttles;
 
 //util imports
 const { translatePersonIdToClientId } = require('../utility/clientPersonTranslation'); // Update the path according to your project structure
@@ -813,5 +814,64 @@ try {
 } catch (error) {
     res.status(500).send({ message: "Error removing reservation from trip." });
 }
+};
+
+//update the shuttle_trip for a trip
+exports.updateGroupShuttle = async (req, res) => {
+    const { tripId, groupId, clientId } = req.params;
+    const { shuttleNumber, dropoffLocation, arrivalTime, flightTime, pickupLocation } = req.body;
+
+    try {
+        // Find or create a trip shuttle entry
+        const [tripShuttle, created] = await TripShuttle.findOrCreate({
+            where: {
+                trip_id: tripId,
+                tripclientid: clientId
+            },
+            defaults: {
+                trip_id: tripId,
+                shuttle_id: shuttleNumber,
+                tripclientid: clientId,
+                dropoff_location: dropoffLocation || null,
+                arrival_time: arrivalTime || null,
+                flight_time: flightTime || null,
+                pickup_location: pickupLocation || null
+            }
+        });
+
+        if (!created) {
+            // If it already exists, update the entry
+            await tripShuttle.update({
+                shuttle_id: shuttleNumber,
+                dropoff_location: dropoffLocation || null,
+                arrival_time: arrivalTime || null,
+                flight_time: flightTime || null,
+                pickup_location: pickupLocation || null
+            });
+        }
+
+        res.send({ message: "Trip shuttle details updated successfully.", tripShuttle });
+    } catch (error) {
+        console.error("Error updating trip shuttle details:", error);
+        res.status(500).send({ message: "Error updating trip shuttle details." });
+    }
+};
+
+exports.fetchTripShuttles = async (req, res) => {
+    const { tripIds, clientIds } = req.body;
+
+    try {
+        const tripShuttles = await TripShuttle.findAll({
+            where: {
+                trip_id: tripIds,
+                tripclientid: clientIds
+            }
+        });
+
+        res.send(tripShuttles);
+    } catch (error) {
+        console.error("Error fetching trip shuttles:", error);
+        res.status(500).send({ message: "Error fetching trip shuttles." });
+    }
 };
 // Other existing or needed endpoints for trips

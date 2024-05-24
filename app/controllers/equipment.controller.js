@@ -237,3 +237,96 @@ exports.getHelicopters = async (req, res) => {
     }
 };
 
+//Shuttle Equipment
+
+const Shuttle = db.shuttles;
+
+// Find all shuttles
+exports.findAllShuttles = async (req, res) => {
+    try {
+        const shuttles = await Shuttle.findAll();
+        res.send(shuttles);
+    } catch (err) {
+        console.error("Error: ", err);
+        res.status(500).send({
+            message: err.message || "Some error occurred while retrieving shuttles."
+        });
+    }
+};
+
+// Find a single shuttle by ID
+exports.findOneShuttle = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const shuttle = await Shuttle.findByPk(id);
+        
+        if (shuttle) {
+            res.send(shuttle);
+        } else {
+            res.status(404).send({ message: `Shuttle with id=${id} not found.` });
+        }
+    } catch (err) {
+        res.status(500).send({ message: "Error retrieving Shuttle with id=" + id });
+    }
+};
+
+// Create a new shuttle
+exports.createShuttle = async (req, res) => {
+    try {
+        const { shuttlename, staffid, description } = req.body;
+        
+        if (!shuttlename) {
+            return res.status(400).send({ message: "Shuttle name cannot be empty!" });
+        }
+
+        const shuttle = {
+            shuttlename,
+            staffid: staffid || null,
+            description: description || null
+        };
+
+        const newShuttle = await Shuttle.create(shuttle);
+        res.send(newShuttle);
+    } catch (err) {
+        res.status(500).send({ message: err.message || "Some error occurred while creating the Shuttle." });
+    }
+};
+
+// Delete a shuttle by ID
+exports.deleteShuttle = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const num = await Shuttle.destroy({ where: { id } });
+        
+        if (num == 1) {
+            res.send({ message: "Shuttle was deleted successfully!" });
+        } else {
+            res.send({ message: `Cannot delete Shuttle with id=${id}. Maybe Shuttle was not found!` });
+        }
+    } catch (err) {
+        res.status(500).send({ message: "Could not delete Shuttle with id=" + id });
+    }
+};
+
+// Update a shuttle by ID
+exports.editShuttle = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { shuttlename, staffid, description } = req.body;
+        
+        const num = await Shuttle.update({ 
+            shuttlename,
+            staffid: staffid || null,
+            description: description || null
+        }, { where: { id } });
+
+        if (num == 1) {
+            res.send({ message: "Shuttle was updated successfully." });
+        } else {
+            res.send({ message: `Cannot update Shuttle with id=${id}. Maybe Shuttle was not found or req.body is empty!` });
+        }
+    } catch (err) {
+        res.status(500).send({ message: "Error updating Shuttle with id=" + id });
+    }
+};
+
