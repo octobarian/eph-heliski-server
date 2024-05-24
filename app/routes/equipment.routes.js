@@ -42,5 +42,19 @@ module.exports = app => {
     router.put("/helicopter/:id", equipment.editHelicopter);
 
 
+    //SHUTTLES
+    // Create a new Shuttle
+    router.post("/shuttle", equipment.createShuttle);
+
+    // Retrieve all Shuttles
+    router.get("/shuttle", equipment.findAllShuttles);
+
+    // Delete a Shuttle with id
+    router.delete("/shuttle/:id", equipment.deleteShuttle);
+
+    // Edit a Shuttle with id
+    router.put("/shuttle/:id", equipment.editShuttle);
+
+
     app.use('/api/equipment', router);
 };

@@ -45,5 +45,12 @@ module.exports = app => {
 
     router.post('/removereservation', trips.removeReservationFromTrip);
 
+    //change the shuttle_trip for a trip
+    router.put("/:tripId/groups/:groupId/clients/:clientId/shuttle", trips.updateGroupShuttle);
+
+    // Route to fetch shuttle details for multiple trip clients
+    router.post("/shuttles", trips.fetchTripShuttles);
+
+
     app.use('/api/trips', router);
 };
