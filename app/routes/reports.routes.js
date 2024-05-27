@@ -9,8 +9,11 @@ module.exports = app => {
     // Route for fetching medical report data
     router.get('/medicalReport', reports.medicalReport);
 
-    // Route for fetching medical report data
+    // Route for fetching lunch report data
     router.get('/lunchReport', reports.lunchReport);
+
+    // Route for fetching daily shuttle report data
+    router.get('/dailyShuttleReport', reports.dailyShuttleReport);
 
     app.use('/api/reports', router);
 };

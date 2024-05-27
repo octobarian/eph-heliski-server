@@ -5,10 +5,15 @@ const { Sequelize, Op } = require('sequelize');
 const Trip = db.trips;
 const Staff = db.staffs;
 const Helicopter = db.helicopters;
+const Shuttle = db.shuttles;
+
 const Person = db.persons;
+
 const TripStaff = db.tripStaff;
 const TripClient = db.tripClients;
 const TripGroup = db.tripGroups;
+const TripShuttle = db.tripShuttles;
+
 const Reservation = db.reservation;
 const Job = db.jobs;
 const PersonCustomField = db.personCustomFields;
@@ -475,3 +480,104 @@ exports.lunchReport = (req, res) => {
         });
     });
 };
+
+exports.dailyShuttleReport = async (req, res) => {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+
+    try {
+        const trips = await Trip.findAll({
+            where: {
+                [Op.and]: [
+                    { start_date: { [Op.lte]: date } },
+                    { end_date: { [Op.gte]: date } }
+                ]
+            },
+            include: [
+                {
+                    model: TripGroup,
+                    as: 'tripGroups',
+                    include: [
+                        {
+                            model: TripClient,
+                            as: 'tripClients',
+                            include: [
+                                {
+                                    model: Reservation,
+                                    as: 'reservation',
+                                    include: [{
+                                        model: Person,
+                                        as: 'person',
+                                        attributes: ['firstname', 'lastname', 'mobilephone', 'email'],
+                                    }],
+                                    attributes: ['reservationid']
+                                },
+                                {
+                                    model: TripShuttle,
+                                    as: 'tripShuttles',
+                                    include: {
+                                        model: Shuttle,
+                                        as: 'shuttle',
+                                        attributes: ['shuttlename']
+                                    }
+                                }
+                            ],
+                            attributes: ['tripclientid']
+                        },
+                        {
+                            model: Staff,
+                            as: 'guide',
+                            include: {
+                                model: Person,
+                                as: 'person',
+                                attributes: ['firstname', 'lastname'],
+                            },
+                            attributes: ['staffid']
+                        }
+                    ],
+                    attributes: ['trip_group_id', 'start_date', 'end_date']
+                },
+                {
+                    model: Helicopter,
+                    as: 'helicopter',
+                    attributes: ['callsign']
+                },
+                {
+                    model: Staff,
+                    as: 'pilot',
+                    include: {
+                        model: Person,
+                        as: 'person',
+                        attributes: ['firstname', 'lastname'],
+                    },
+                    attributes: ['staffid']
+                },
+            ]
+        });
+
+        const reportData = trips.flatMap(trip =>
+            trip.tripGroups.flatMap(group =>
+                group.tripClients.map(client => {
+                    const tripShuttle = client.tripShuttles[0];
+                    return {
+                        firstname: client.reservation.person.firstname,
+                        lastname: client.reservation.person.lastname,
+                        phone: client.reservation.person.mobilephone,
+                        email: client.reservation.person.email,
+                        groupCode: group.trip_group_id,
+                        shuttleName: tripShuttle ? tripShuttle.shuttle.shuttlename : 'Drive Self',
+                        dropoff_location: tripShuttle ? tripShuttle.dropoff_location : 'N/A',
+                        arrival_time: tripShuttle ? tripShuttle.arrival_time : 'N/A',
+                        flight_time: tripShuttle ? tripShuttle.flight_time : 'N/A',
+                        pickup_location: tripShuttle ? tripShuttle.pickup_location : 'N/A'
+                    };
+                })
+            )
+        );
+
+        res.json(reportData);
+    } catch (error) {
+        console.error("Error fetching shuttle data:", error);
+        res.status(500).send({ message: "Error fetching shuttle data." });
+    }
+};
+
