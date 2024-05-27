@@ -107,7 +107,8 @@ exports.dailyTripsReport = (req, res) => {
                 ],
                 attributes: ['trip_group_id', 'start_date', 'end_date'] // Include group details
             },
-        ]
+        ],
+        order: [['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
     })
     .then(trips => {
 
@@ -124,16 +125,17 @@ exports.dailyTripsReport = (req, res) => {
                 });
             });
         });
-        
 
         // Transform the Sequelize data into the format expected by the report generator
-        const reportData = trips.map(trip => {
+        const reportData = trips.map((trip, tripIndex) => {
             return {
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname || 'Unknown'} ${trip.pilot.person.lastname || 'Pilot'}` : 'No pilot',
-                groups: trip.tripGroups.map(group => {
+                heliIndex: tripIndex + 1,
+                groups: trip.tripGroups.map((group, groupIndex) => {
                     return {
                         groupId: group.trip_group_id || 'N/A',
+                        groupIndex: groupIndex + 1,
                         clients: group.tripClients.map(tc => {
                             const person = tc.reservation.person || {};
                             let hasMedicalField = false;
@@ -166,8 +168,7 @@ exports.dailyTripsReport = (req, res) => {
                                     hasRiderType = fieldValue;
                                 }
                             });
-                            
-        
+
                             return {
                                 firstName: person.firstname || 'Unknown',
                                 lastName: person.lastname || 'Client',
@@ -280,35 +281,25 @@ exports.medicalReport = (req, res) => {
             54: "Severity",
             // Assuming 'Severity' relates to the severity of allergies, etc.
           };
-          
-        // trips.forEach(trip => {
-        //     trip.tripGroups.forEach(group => {
-        //         group.tripClients.forEach(tc => {
-        //             if (tc.reservation && tc.reservation.person) {
-        //                 console.log(`CustomFields for ${tc.reservation.person.firstname} ${tc.reservation.person.lastname}:`);
-        //                 // Test: Print out the customFields of each person before mapping
-        //                 console.log(tc.reservation.person.customFields);
-        //             }
-        //         });
-        //     });
-        // });
 
         const reportData = trips
             .filter(trip => trip.tripGroups.length > 0)
-            .map(trip => {
+            .map((trip, tripIndex) => {
                 return {
                     helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                     pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
+                    heliIndex: tripIndex + 1,
                     groups: trip.tripGroups
                         .filter(group => group.tripClients.length > 0)
-                        .map(group => {
+                        .map((group, groupIndex) => {
                             return {
                                 groupId: group.trip_group_id,
+                                groupIndex: groupIndex + 1,
                                 clients: group.tripClients
                                     .filter(tc => tc.reservation && tc.reservation.person)
                                     .map(tc => {
                                         const person = tc.reservation.person;
-                                        
+
                                         // Map the customFields to the report's expected structure
                                         const mappedCustomFields = {};
                                         person.customFields.forEach(cf => {
@@ -342,7 +333,7 @@ exports.medicalReport = (req, res) => {
             errorDetails: err.message,
         });
     });
-    
+
 };
 
 exports.lunchReport = (req, res) => {
@@ -417,13 +408,15 @@ exports.lunchReport = (req, res) => {
             },
         ]
     }).then(trips => {
-        const reportData = trips.map(trip => {
+        const reportData = trips.map((trip, tripIndex) => {
             return {
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
-                groups: trip.tripGroups.map(group => {
+                heliIndex: tripIndex + 1,
+                groups: trip.tripGroups.map((group, groupIndex) => {
                     return {
                         groupId: group.trip_group_id,
+                        groupIndex: groupIndex + 1,
                         clients: group.tripClients.map(tc => {
                             const person = tc.reservation.person;
                             const dietaryInfo = {
@@ -435,16 +428,15 @@ exports.lunchReport = (req, res) => {
                             const isNonMeaningfulValue = (value) => {
                                 return !value || value.toLowerCase() === 'no' || value === '{}';
                             };
-                            
+
                             person.customFields.forEach(cf => {
-                                console.log('customField: ' + JSON.stringify(cf.dataValues.custom_f));
                                 let fieldValue = cf.dataValues.field_va;
-                            
+
                                 // If the value is 'no' or an empty object, set it to false
                                 if (isNonMeaningfulValue(fieldValue)) {
                                     fieldValue = false;
                                 }
-                            
+
                                 switch (cf.dataValues.custom_f) {
                                     case 31: // I have special dietary requests or food preferences
                                         dietaryInfo.dietaryRestrictions = fieldValue;
@@ -551,11 +543,12 @@ exports.dailyShuttleReport = async (req, res) => {
                     },
                     attributes: ['staffid']
                 },
-            ]
+            ],
+            order: [['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
         });
 
-        const reportData = trips.flatMap(trip =>
-            trip.tripGroups.flatMap(group =>
+        const reportData = trips.flatMap((trip, tripIndex) =>
+            trip.tripGroups.flatMap((group, groupIndex) =>
                 group.tripClients.map(client => {
                     const tripShuttle = client.tripShuttles[0];
                     return {
@@ -563,7 +556,8 @@ exports.dailyShuttleReport = async (req, res) => {
                         lastname: client.reservation.person.lastname,
                         phone: client.reservation.person.mobilephone,
                         email: client.reservation.person.email,
-                        groupCode: group.trip_group_id,
+                        heliIndex: tripIndex + 1,
+                        groupIndex: groupIndex + 1,
                         shuttleName: tripShuttle ? tripShuttle.shuttle.shuttlename : 'Drive Self',
                         dropoff_location: tripShuttle ? tripShuttle.dropoff_location : 'N/A',
                         arrival_time: tripShuttle ? tripShuttle.arrival_time : 'N/A',
