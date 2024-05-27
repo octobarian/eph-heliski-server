@@ -621,6 +621,27 @@ router.post("/get-guest-profile-by-booking", async (req, res) => {
   }
 });
 
+router.post("/get-booking-by-number", async (req, res) => {
+  const bookingNumber = req.body.bookingNumber || 16119; // Use booking number from request or default to 16119
+
+  const requestData = {
+    zapiToken: zapiToken,
+    zapiAccountId: zapiAccountId,
+    zapiUserId: zapiUserId,
+    zapiMethod: {
+      methodName: "zapiSearchBookingsByBookingNumber",
+      bookingNumber: bookingNumber
+    }
+  };
+
+  try {
+    const result = await axios.post(zauiUrl, requestData, config);
+    res.json(result.data);
+  } catch (error) {
+    console.error("Error fetching booking by number:", error);
+    res.status(500).json({ error: "Failed to fetch booking by number" });
+  }
+});
 
 
 
