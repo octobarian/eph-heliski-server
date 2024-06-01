@@ -17,12 +17,12 @@ const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
 
 const db = {};
 
-//Requires both imports to handle 
+// Requires both imports to handle 
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
 // Models/tables (ADD MODEL FOR EACH MODEL HERE)
-//People Models
+// People Models
 db.tutorials = require("./tutorial.model.js")(sequelize, Sequelize);
 db.clients = require("./client.model.js")(sequelize, Sequelize); 
 db.persons = require("./person.model.js")(sequelize, Sequelize); 
@@ -35,54 +35,56 @@ db.healthrecordtypes = require("./healthRecordTypes.model.js")(sequelize, Sequel
 db.healthrecordvalues = require("./healthRecordValues.model.js")(sequelize, Sequelize);
 db.healthseverities = require("./healthSeverities.model.js")(sequelize, Sequelize);
 
-//staff imports
+// Staff imports
 db.staffs = require("./staff.model.js")(sequelize, Sequelize);
 db.jobs = require("./job.model.js")(sequelize, Sequelize); // Uncomment and modify as needed
 
-//reservation imports
+// Reservation imports
 db.reservation = require('./reservation.model.js')(sequelize, Sequelize);
 db.reservationDetails = require('./reservationdetails.model.js')(sequelize, Sequelize);
 db.activities = require('./activities.model.js')(sequelize, Sequelize);
 
-//zaui imports
+// Zaui imports
 db.zauiStatuses = require("./zauiStatus.model.js")(sequelize, Sequelize);
 db.zauiDailyManifest = require("./zauiDailyManifest.model.js")(sequelize, Sequelize);
 
-//Trip Imports
+// Trip imports
 db.trips = require('./trip.model.js')(sequelize, Sequelize);
 db.tripStaff = require('./tripStaff.model.js')(sequelize, Sequelize);
 db.tripClients = require('./tripclient.model.js')(sequelize, Sequelize);
 db.tripGroups = require('./tripGroup.model.js')(sequelize, Sequelize);
 db.tripShuttles = require("./tripShuttles.model.js")(sequelize, Sequelize);
 
-//Equipment Imports (heli, beacon, van, etc)
+// Equipment imports (heli, beacon, van, etc)
 db.beacons = require('./beacon.model.js')(sequelize, Sequelize);
 db.helicopters = require('./helicopter.model.js')(sequelize, Sequelize);
-db.shuttles = require('./shuttle.model.js')(sequelize, Sequelize); // Add this line
+db.shuttles = require('./shuttle.model.js')(sequelize, Sequelize);
 
-//Notes imports
+// Notes imports
 db.notes = require('./notes.model.js')(sequelize, Sequelize);
+
+// Runs and Zones imports
+db.runs = require('./runs.model.js')(sequelize, Sequelize);
+db.zones = require('./zones.model.js')(sequelize, Sequelize);
+// New TripRun model
+db.tripruns = require('./tripruns.model.js')(sequelize, Sequelize);
 
 // Define associations
 // Associate personhealth with person
 db.persons.hasMany(db.personhealth, { foreignKey: 'personid', as: 'personhealth' });
-// Associate personhealth with healthrecordvalues
 db.personhealth.belongsTo(db.healthrecordvalues, { foreignKey: 'healthrecordvalueid', as: 'healthrecordvalue' });
-// Associate personhealth with healthseverities
 db.personhealth.belongsTo(db.healthseverities, { foreignKey: 'severityid', as: 'severity' });
-// Associate healthRecord Value with Recordtypes
 db.healthrecordvalues.belongsTo(db.healthrecordtypes, { foreignKey: 'healthrecordtypeid', as: 'healthrecordtype' });
+
 // Associating Customvalues to person
-// Association between Persons and PersonCustomFields
 db.persons.hasMany(db.personCustomFields, { foreignKey: 'personid', as: 'customFields' });
 db.personCustomFields.belongsTo(db.persons, { foreignKey: 'personid', as: 'person' });
-
-// Association between PersonCustomFields and CustomFieldOptions
 db.personCustomFields.belongsTo(db.customFieldOptions, { foreignKey: 'custom_field_option_id', as: 'customFieldDefinition' });
 db.customFieldOptions.hasMany(db.personCustomFields, { foreignKey: 'custom_field_option_id', as: 'customFieldInstances' });
 
-// client Relation 
+// Client Relation 
 db.clients.belongsTo(db.persons, { foreignKey: 'personid', as: 'person' });
+
 // Staff Relations
 db.staffs.belongsTo(db.persons, { foreignKey: 'personid', as: 'person' });
 db.staffs.belongsTo(db.jobs, { foreignKey: 'jobid', as: 'job' }); 
@@ -91,33 +93,26 @@ db.staffs.hasMany(db.tripStaff, { foreignKey: 'staffid', as: 'staffMembers' });
 // Reservation Relations
 db.reservation.belongsTo(db.persons, { foreignKey: 'personid', as: 'person' });
 db.reservation.hasMany(db.reservationDetails, { foreignKey: 'reservationid', as: 'details' });
-db.reservation.hasMany(db.tripClients, {foreignKey: 'reservationid',as: 'tripClients'});
+db.reservation.hasMany(db.tripClients, {foreignKey: 'reservationid', as: 'tripClients'});
 
 // ReservationDetails Relation
 db.reservationDetails.belongsTo(db.reservation, { foreignKey: 'reservationid', as: 'reservation' });
-
-// ReservationDetails and Activities Association
 db.reservationDetails.belongsTo(db.activities, { foreignKey: 'activityid', as: 'activity' });
 db.activities.hasMany(db.reservationDetails, { foreignKey: 'activityid', as: 'reservationDetails' });
 
 // Trip Relations
-db.trips.belongsTo(db.staffs, { foreignKey: 'pilotid', as: 'pilot' }); // Assuming staffs table contains pilots
+db.trips.belongsTo(db.staffs, { foreignKey: 'pilotid', as: 'pilot' });
 db.trips.belongsTo(db.helicopters, { foreignKey: 'helicopterid', as: 'helicopter' });
 db.trips.hasMany(db.tripStaff, { foreignKey: 'tripid', as: 'tripStaff' });
 db.trips.belongsTo(db.notes, { foreignKey: 'noteid', as: 'note' });
-
-// Helicopter Relations
 db.helicopters.hasMany(db.trips, { foreignKey: 'helicopterid', as: 'trips' });
 
 // Shuttle Relations
 db.shuttles.belongsTo(db.staffs, { foreignKey: 'staffid', as: 'staff' });
-// Define associations
 db.trips.hasMany(db.tripShuttles, { foreignKey: 'trip_id', as: 'tripShuttles' });
 db.tripShuttles.belongsTo(db.trips, { foreignKey: 'trip_id', as: 'trip' });
-
 db.shuttles.hasMany(db.tripShuttles, { foreignKey: 'shuttle_id', as: 'tripShuttles' });
 db.tripShuttles.belongsTo(db.shuttles, { foreignKey: 'shuttle_id', as: 'shuttle' });
-
 db.tripClients.hasMany(db.tripShuttles, { foreignKey: 'tripclientid', as: 'tripShuttles' });
 db.tripShuttles.belongsTo(db.tripClients, { foreignKey: 'tripclientid', as: 'tripClient' });
 
@@ -128,14 +123,12 @@ db.tripStaff.belongsTo(db.staffs, { foreignKey: 'staffid', as: 'staff' });
 // TripClient Associations
 db.tripClients.belongsTo(db.clients, { foreignKey: 'clientid', as: 'client' });
 db.clients.hasMany(db.tripClients, { foreignKey: 'clientid', as: 'tripClients' });
-db.tripClients.belongsTo(db.reservation, {foreignKey: 'reservationid',as: 'reservation'});
+db.tripClients.belongsTo(db.reservation, {foreignKey: 'reservationid', as: 'reservation'});
 
 // TripGroup Associations
 db.trips.hasMany(db.tripGroups, { foreignKey: 'trip_id', as: 'tripGroups' });
 db.staffs.hasMany(db.tripGroups, { foreignKey: 'guide_id', as: 'guidedGroups' });
 db.tripGroups.belongsTo(db.staffs, { foreignKey: 'guide_id', as: 'guide' });
-
-// Modify the TripClient associations
 db.tripClients.belongsTo(db.tripGroups, { foreignKey: 'trip_group_id', as: 'tripGroup' });
 db.tripGroups.hasMany(db.tripClients, { foreignKey: 'trip_group_id', as: 'tripClients' });
 
@@ -147,7 +140,19 @@ db.tripClients.hasOne(db.beacons, { foreignKey: 'tripclientid', as: 'beacon' });
 db.persons.hasMany(db.notes, { foreignKey: 'personid', as: 'notes' });
 db.notes.hasOne(db.trips, { foreignKey: 'noteid' });
 
-//One to many associations
+// Runs and Zones Associations
+db.zones.hasMany(db.runs, { foreignKey: 'zoneid', as: 'runs' });
+db.runs.belongsTo(db.zones, { foreignKey: 'zoneid', as: 'zone' });
+
+// TripRun Associations
+db.trips.hasMany(db.tripruns, { foreignKey: 'tripid', as: 'tripRuns' });
+db.runs.hasMany(db.tripruns, { foreignKey: 'runid', as: 'runTrips' });
+db.tripruns.belongsTo(db.trips, { foreignKey: 'tripid', as: 'trip' });
+db.tripruns.belongsTo(db.runs, { foreignKey: 'runid', as: 'run' });
+db.tripruns.belongsTo(db.tripGroups, { foreignKey: 'trip_group_id', as: 'tripGroup' });
+
+
+// Many-to-Many Associations
 db.trips.belongsToMany(db.clients, {
   through: db.tripClients,
   foreignKey: 'tripid',
