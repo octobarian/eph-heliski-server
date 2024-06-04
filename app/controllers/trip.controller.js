@@ -432,8 +432,12 @@ exports.findByDate = (req, res) => {
                         }
                     }
                 ],
-                attributes: ['trip_group_id', 'start_date', 'end_date']
+                attributes: ['trip_group_id', 'start_date', 'end_date'],
+                order: ['trip_group_id','ASC']
             },
+        ],
+        order: [
+            ['tripid', 'ASC']
         ]
     })
     .then(data => {
@@ -485,7 +489,6 @@ exports.findByDate = (req, res) => {
                     }; 
                 });
                 
-                console.log("END DATE FOR GROUPL:"+group.end_date);
                 return {
                     groupid: group.trip_group_id?group.trip_group_id:null,
                     start_date: group.start_date, 
