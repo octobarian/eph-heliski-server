@@ -12,6 +12,7 @@ const TripGroup = db.tripGroups;
 const Reservation = db.reservation;
 const Job = db.jobs;
 const TripShuttle = db.tripShuttles;
+const Note = db.notes;
 
 //util imports
 const { translatePersonIdToClientId } = require('../utility/clientPersonTranslation'); // Update the path according to your project structure
@@ -430,6 +431,10 @@ exports.findByDate = (req, res) => {
                             model: Person,
                             as: 'person'
                         }
+                    },
+                    {
+                        model: Note,
+                        as: 'note'
                     }
                 ],
                 attributes: ['trip_group_id', 'start_date', 'end_date'],
@@ -495,6 +500,7 @@ exports.findByDate = (req, res) => {
                     end_date: group.end_date,
                     guide: guide,
                     clients: clients,
+                    noteContent: group.note ? group.note.text : ''
                 };
             });
     
