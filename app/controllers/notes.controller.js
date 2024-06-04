@@ -1,6 +1,9 @@
 const db = require("../models");
+
 const Note = db.notes;
 const Trip = db.trips
+const TripRun = db.tripruns;
+const TripGroup = db.tripGroups;
 
 // Create and Save a new Note
 exports.createNote = (req, res) => {
@@ -29,6 +32,12 @@ exports.createNote = (req, res) => {
                         .then(() => {
                             return data; // Return the note data after linking it
                         });
+                case 'tripGroupNote':
+                    // Link the created note to the trip group
+                    return TripGroup.update({ noteid: data.noteid }, { where: { trip_group_id: req.body.itemid } })
+                        .then(() => {
+                            return data;
+                        });
                 case 'beaconnote':
                     // Future implementation for beacon note
                     break;
@@ -54,6 +63,8 @@ exports.createNote = (req, res) => {
             });
         });
 };
+
+
 
 
 
@@ -92,6 +103,7 @@ exports.findOne = (req, res) => {
 };
 
 // Retrieve a note associated with a given trip ID
+// Used in TripCard.vue
 exports.getTripNote = (req, res) => {
     const tripId = req.params.tripId;
 
@@ -114,6 +126,62 @@ exports.getTripNote = (req, res) => {
     .catch(err => {
         res.status(500).send({
             message: "Error retrieving note for trip ID " + tripId
+        });
+    });
+};
+
+// Retrieve a note associated with a given trip group ID
+// Used in RunAdmin.vue
+exports.getTripGroupNote = (req, res) => {
+    const tripGroupId = req.params.tripGroupId;
+
+    console.log("FOUND TRIPGROUPID:" + tripGroupId)
+    TripGroup.findByPk(tripGroupId, {
+        include: [{
+            model: Note,
+            as: 'note'
+        }]
+    })
+    .then(group => {
+        if (group && group.note) {
+            res.send(group.note);
+        } else {
+            res.status(404).send({
+                message: `No note found for trip group ID ${tripGroupId}.`
+            });
+        }
+    })
+    .catch(err => {
+        res.status(500).send({
+            message: "Error retrieving note for trip group ID " + tripGroupId
+        });
+    });
+};
+
+// Retrieve a note associated with a given run ID
+// Unused, could be used for notes on a run in RunsAdmin.vue
+exports.getTripRunNote = (req, res) => {
+    const triprunid = req.params.runId;
+
+    console.log("FOUND RUNID:" + triprunid)
+    TripRun.findByPk(triprunid, {
+        include: [{
+            model: Note,
+            as: 'note'
+        }]
+    })
+    .then(triprun => {
+        if (triprun && triprun.note) {
+            res.send(triprun.note);
+        } else {
+            res.status(404).send({
+                message: `No note found for run ID ${triprunid}.`
+            });
+        }
+    })
+    .catch(err => {
+        res.status(500).send({
+            message: "Error retrieving note for run ID " + triprunid
         });
     });
 };

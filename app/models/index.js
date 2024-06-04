@@ -131,6 +131,8 @@ db.staffs.hasMany(db.tripGroups, { foreignKey: 'guide_id', as: 'guidedGroups' })
 db.tripGroups.belongsTo(db.staffs, { foreignKey: 'guide_id', as: 'guide' });
 db.tripClients.belongsTo(db.tripGroups, { foreignKey: 'trip_group_id', as: 'tripGroup' });
 db.tripGroups.hasMany(db.tripClients, { foreignKey: 'trip_group_id', as: 'tripClients' });
+db.tripGroups.belongsTo(db.notes, { foreignKey: 'noteid', as: 'note' }); // Association with notes
+
 
 // Beacon Associations
 db.beacons.belongsTo(db.tripClients, { foreignKey: 'tripclientid', as: 'tripClient', allowNull: true });

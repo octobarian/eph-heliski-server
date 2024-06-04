@@ -28,6 +28,14 @@ module.exports = (sequelize, Sequelize) => {
                 model: 'staff', // This should match the table name as defined in Sequelize
                 key: 'staffid'
             }
+        },
+        noteid: { // Foreign key to 'notes' table
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'notes',
+                key: 'noteid'
+            }
         }
         // Add other attributes like group name, level, etc., if needed
     }, {

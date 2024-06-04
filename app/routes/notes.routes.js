@@ -12,8 +12,14 @@ module.exports = app => {
     // Retrieve a single Note with id
     router.get("/:id", notes.findOne);
 
-    //find a note via tripid
+    // Find a note via tripId
     router.get("/trip/:tripId", notes.getTripNote);
+
+    // Find a note via runId
+    router.get("/run/:tripRunId", notes.getTripRunNote);
+
+    // Find a note via tripGroupId
+    router.get("/group/:tripGroupId", notes.getTripGroupNote);
 
     // Update a Note with id
     router.put("/:id", notes.update);
