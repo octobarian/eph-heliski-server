@@ -69,6 +69,9 @@ db.zones = require('./zones.model.js')(sequelize, Sequelize);
 // New TripRun model
 db.tripruns = require('./tripruns.model.js')(sequelize, Sequelize);
 
+// Wildlife model import
+db.wildlife = require('./wildlife.model.js')(sequelize, Sequelize);
+
 // Define associations
 // Associate personhealth with person
 db.persons.hasMany(db.personhealth, { foreignKey: 'personid', as: 'personhealth' });
@@ -133,7 +136,6 @@ db.tripClients.belongsTo(db.tripGroups, { foreignKey: 'trip_group_id', as: 'trip
 db.tripGroups.hasMany(db.tripClients, { foreignKey: 'trip_group_id', as: 'tripClients' });
 db.tripGroups.belongsTo(db.notes, { foreignKey: 'noteid', as: 'note' }); // Association with notes
 
-
 // Beacon Associations
 db.beacons.belongsTo(db.tripClients, { foreignKey: 'tripclientid', as: 'tripClient', allowNull: true });
 db.tripClients.hasOne(db.beacons, { foreignKey: 'tripclientid', as: 'beacon' });
@@ -153,13 +155,20 @@ db.tripruns.belongsTo(db.trips, { foreignKey: 'tripid', as: 'trip' });
 db.tripruns.belongsTo(db.runs, { foreignKey: 'runid', as: 'run' });
 db.tripruns.belongsTo(db.tripGroups, { foreignKey: 'trip_group_id', as: 'tripGroup' });
 
+// Wildlife Associations
+db.wildlife.belongsTo(db.runs, { foreignKey: 'runid', as: 'run' });
+db.wildlife.belongsTo(db.tripGroups, { foreignKey: 'tripgroupid', as: 'tripGroup' });
+db.wildlife.belongsTo(db.persons, { foreignKey: 'observerid', as: 'observer' });
+db.tripGroups.hasMany(db.wildlife, { foreignKey: 'tripgroupid', as: 'wildlifeSightings' });
+db.runs.hasMany(db.wildlife, { foreignKey: 'runid', as: 'wildlifeSightings' });
+db.persons.hasMany(db.wildlife, { foreignKey: 'observerid', as: 'wildlifeSightings' });
 
 // Many-to-Many Associations
 db.trips.belongsToMany(db.clients, {
   through: db.tripClients,
   foreignKey: 'tripid',
   otherKey: 'clientid',
-  as: 'clients'
+  as: 'clients' 
 });
 
 db.clients.belongsToMany(db.trips, {
