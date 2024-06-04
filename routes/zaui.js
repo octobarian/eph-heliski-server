@@ -4,6 +4,9 @@ const axios = require("axios").default;
 const qs = require("query-string");
 const db = require("../app/models");
 
+const fs = require('fs');
+const path = require('path');
+
 const config = {
   headers: {
     "Content-Type": "application/json", // Change content type to JSON
@@ -181,54 +184,66 @@ router.get("/get-date-manifest", async (req, res) => {
 router.post("/check-zaui-mapping", async (req, res) => {
   let results = [];
   const date = req.query.date;
-    try {
-      // Step 1: Fetch the day's manifest
-      const manifest = await db.zauiDailyManifest.findOne({
-          where: { manifestdate: date }
-      });
+  try {
+    // Step 1: Fetch the day's manifest
+    const manifest = await db.zauiDailyManifest.findOne({
+      where: { manifestdate: date }
+    });
 
-      if (!manifest) {
-        // If no manifest is found for the given date, return a specific message
-        console.log(`No manifest found for date: ${date}`);
-        return res.json([`No manifest found for date: ${date}`]);
-      }  else {console.log(manifest.response.response)}
+    if (!manifest) {
+      // If no manifest is found for the given date, return a specific message
+      console.log(`No manifest found for date: ${date}`);
+      return res.json([`No manifest found for date: ${date}`]);
+    } else {
+      console.log(manifest.response.response);
+    }
 
-      const activities = manifest.response.response.methodResponse.activities.activity;
+    const activities = manifest.response.response.methodResponse.activities.activity;
 
-      if (!activities) {
-        // If no manifest is found for the given date, return a specific message
-        console.log(`No activities found for date: ${date}`);
-        return res.json([`No activities found for date: ${date}`]);
-      }  else {console.log(manifest.response.response)}
+    if (!activities) {
+      // If no activities are found for the given date, return a specific message
+      console.log(`No activities found for date: ${date}`);
+      return res.json([`No activities found for date: ${date}`]);
+    } else {
+      console.log(manifest.response.response);
+    }
 
-      // Step 2: Parse the JSON response and extract booking numbers
-      for (const activity of activities) {
-          const bookings = activity.allBookings.booking;
-          for (const booking of bookings) {
-              const bookingNumber = booking.bookingNumber;
-
-              // Step 3: Check each booking number against the reservation table
-              const reservation = await  db.reservation.findOne({
-                  where: { zauireservationid: bookingNumber }
-              });
-
-              if (reservation) {
-                results.push(`zaui_daily_response - bookingNumber ${bookingNumber} ..... reservation - id ${reservation.reservationid}`);
-              } else {
-                results.push(`zaui_daily_response - bookingNumber ${bookingNumber} ..... No matching reservation found`);
-              }
-          }
+    // Step 2: Parse the JSON response and extract booking numbers
+    for (const activity of activities) {
+      let bookings = activity.allBookings.booking;
+      
+      // Ensure bookings is an array
+      if (!Array.isArray(bookings)) {
+        bookings = [bookings];
       }
 
-      // Nicely print out the results from the array
-      console.log("Reservation Check Results:");
-      results.forEach(result => console.log(result));
-      
-      res.json(results);
+      for (const booking of bookings) {
+        const bookingNumber = booking.bookingNumber;
+
+        // Step 3: Check each booking number against the reservation table
+        const reservation = await db.reservation.findOne({
+          where: { zauireservationid: bookingNumber }
+        });
+
+        if (reservation) {
+          results.push(`zaui_daily_response - bookingNumber ${bookingNumber} ..... reservation - id ${reservation.reservationid}`);
+        } else {
+          results.push(`zaui_daily_response - bookingNumber ${bookingNumber} ..... No matching reservation found`);
+        }
+      }
+    }
+
+    // Nicely print out the results from the array
+    console.log("Reservation Check Results:");
+    results.forEach(result => console.log(result));
+    
+    res.json(results);
   } catch (err) {
-      console.error(`Error checking reservations for day ${date}:`, err);
+    console.error(`Error checking reservations for day ${date}:`, err);
+    res.status(500).send({ message: `Error checking reservations for day ${date}`, error: err.message });
   }
 });
+
 
 // OLD MAPPING CODE 2024-03-22:
 // async function mapManifestToDBSchema(manifestData) {
@@ -374,215 +389,242 @@ router.post("/check-zaui-mapping", async (req, res) => {
 //   }
 // }
 
+function logToFile(message) {
+  const logFilePath = path.join(__dirname, 'log.txt');
+  fs.appendFileSync(logFilePath, message + '\n', 'utf8');
+}
+
 async function mapManifestToDBSchema(manifestData) {
   console.log("BEGIN MAPPING MANIFEST");
+  logToFile("BEGIN MAPPING MANIFEST");
   var processErrors = [];
-    // Check if activities are present
-    if (!manifestData.response.methodResponse.activities || !manifestData.response.methodResponse.activities.activity) {
-      console.log("No activities for the day");
-      processErrors.push('No Activities');
-       // Return a message as an array for consistency
-    }
-
-    var activitiesData = manifestData.response.methodResponse.activities.activity;
-    var manifestActivityDate = manifestData.response.methodResponse.manifestDate;
-
-    activitiesData = Array.isArray(activitiesData) ? activitiesData : [activitiesData];
-    // Check if there are actually no activities after normalization
-    if (activitiesData.length === 0) {
-      console.log("No Normalized activities for the day");
-      processErrors.push('No Activities');
-       // Return a message as an array for consistency
-    }
-
-    if(processErrors.length > 0){
-      return processErrors;
-    }
-    // Initialize an array to collect all results
-    let allResults = [];
-
-    // Process each activity
-    try {
-      console.log('GETTING/SETTING ALL ACTIVITIES');
-      for (const activityData of activitiesData) {
-        const [activity, _] = await db.activities.findOrCreate({
-          where: {
-            zauiactivityid: activityData.activityId,
-            activityname: activityData.activityName
-          },
-          defaults: {
-            zauiactivityid: activityData.activityId,
-            activityname: activityData.activityName
-          }
-        });
-
-        let bookings = Array.isArray(activityData.allBookings.booking) ? activityData.allBookings.booking : [activityData.allBookings.booking];
-
-        console.log('GETTING/SETTING ALL BOOKINGS');
-        for (const booking of bookings) {
-          // Use a self-executing async function to allow await within the loop
-          const bookingResult = await (async () => {
-            try {
-              return await db.sequelize.transaction(async (transaction) => {
-                console.log(`Processing Booking:`, booking);
-
-                const [person, personCreated] = await db.persons.findOrCreate({
-                  where: {
-                    email: booking.email,
-                    firstname: booking.guestFirstName,
-                    lastname: booking.guestLastName
-                  },
-                  defaults: {
-                    firstname: booking.guestFirstName,
-                    lastname: booking.guestLastName,
-                    mobilephone: booking.mobile && typeof booking.mobile === 'string' ? booking.mobile.replace(/[^0-9]/g, '') : 9999999999
-                    // other person fields
-                  },
-                  transaction
-                });
-
-                console.log(`Person ${personCreated ? 'created' : 'found'}:`, person);
-
-                let client = personCreated ? 
-                            await db.clients.create({ personid: person.personid }, { transaction }) : 
-                            await db.clients.findOne({ where: { personid: person.personid }, transaction });
-
-                console.log('Client:', client);
-
-            // Handle Custom Fields
-            console.log('GETTING/SETTING GUEST');
-            const guestProfile = await getGuestProfile(booking);
-
-
-            if (guestProfile && guestProfile.response.methodResponse.guestDetails && guestProfile.response.methodResponse.guestDetails.userCustomFields) {
-              console.log('GUEST DETAILS BELOW')
-              console.log(guestProfile.response.methodResponse.guestDetails);
-              for (const field of guestProfile.response.methodResponse.guestDetails.userCustomFields.customField) {
-                const fieldValue = typeof field.customFieldValue === 'object' ? JSON.stringify(field.customFieldValue) : field.customFieldValue;
-            
-                let customFieldOption = await db.customFieldOptions.findOne({
-                  where: { field_name: field.customFieldLabel }
-                });
-                
-                // If not found, try a "like" search
-                if (!customFieldOption) {
-                  customFieldOption = await db.customFieldOptions.findOne({
-                    where: {
-                      field_name: {
-                        [db.Sequelize.Op.like]: `%${field.customFieldLabel}%`
-                      }
-                    }
-                  });
-                }
-                
-                // If still not found, create a new customFieldOption
-                if (!customFieldOption) {
-                  console.log(`Custom field option not found for label: ${field.customFieldLabel}, creating new.`);
-                  customFieldOption = await db.customFieldOptions.create({
-                    field_name: field.customFieldLabel
-                  });
-                }
-            
-                const [customField, created] = await db.personCustomFields.findOrCreate({
-                  where: {
-                    personid: person.personid,
-                    custom_field_option_id: customFieldOption.id
-                  },
-                  defaults: {
-                    field_name: field.customFieldLabel, 
-                    field_value: fieldValue,
-                    custom_field_option_id: customFieldOption.id
-                  },
-                  transaction
-                });
-                
-                if (!created) {
-                  // If the custom field exists, update the field_value (and field_name if needed)
-                  await customField.update({
-                    field_name: field.customFieldLabel, // Optionally update the field name as well
-                    field_value: fieldValue,
-                    custom_field_option_id: customFieldOption.id // This should remain the same but included for completeness
-                  }, { transaction });
-                }
-              }
-            }
-
-            console.log('SETTING PERSON WEIGHT');
-            const weightCustomField = await db.personCustomFields.findOne({
-              where: {
-                personid: person.personid,
-                custom_field_option_id: 57 // Assuming 57 is the ID for the weight custom field
-              },
-              transaction
-            });
-
-            if (weightCustomField) {
-              let sanitizedWeightValue = weightCustomField.field_value;
-
-              // Check if the weight includes 'lbs'. If so, remove 'lbs' from the string.
-              if (sanitizedWeightValue.toLowerCase().includes('lbs')) {
-                sanitizedWeightValue = sanitizedWeightValue.replace(/lbs/gi, '').trim();
-              }
-
-              // Check if the weight includes 'kg'. If so, remove 'kg', convert it to pounds.
-              if (sanitizedWeightValue.toLowerCase().includes('kg')) {
-                sanitizedWeightValue = sanitizedWeightValue.replace(/kg/gi, '').trim();
-                // Convert kilograms to pounds
-                sanitizedWeightValue = parseFloat(sanitizedWeightValue) * 2.20462;
-              }
-
-              // Ensure the weight is a number before updating. If not a number, default to a safe value.
-              sanitizedWeightValue = isNaN(parseFloat(sanitizedWeightValue)) ? 0 : parseFloat(sanitizedWeightValue);
-              sanitizedWeightValue = Math.round(sanitizedWeightValue);
-
-              // Update the person's weight with the sanitized and possibly converted value
-              await person.update({
-                weight: sanitizedWeightValue
-              }, { transaction });
-
-              console.log(`Person weight set to ${sanitizedWeightValue}`);
-            }
-
-        
-            const [reservation, reservationCreated] = await db.reservation.findOrCreate({
-              where: { zauireservationid: booking.bookingNumber },
-              defaults: {
-                personid: person.personid,
-                activitydate: manifestActivityDate || new Date().toISOString().slice(0, 10), //will default to today if there's no activity date
-                balanceowing: booking.outstandingBalance,
-                zauireservationid: booking.bookingNumber,
-                activityid: activity.activityid
-              },
-              transaction
-            });
-
-            console.log(`Reservation ${reservationCreated ? 'created' : 'found'}:`, reservation);
-
-            await db.reservationDetails.create({
-              reservationid: reservation.reservationid,
-              activityid: activity.activityid
-              // Add other relevant fields and defaults for reservationDetails here
-            }, { transaction });
-
-            return { person, client, reservation };
-          });
-        } catch (error) {
-          console.error("Error processing booking:", error);
-          return error;
-        }
-      })();
-      // Collect results for each booking
-      allResults.push(bookingResult);
-    }
+  
+  // Check if activities are present
+  if (!manifestData.response.methodResponse.activities || !manifestData.response.methodResponse.activities.activity) {
+    console.log("No activities for the day");
+    logToFile("No activities for the day");
+    processErrors.push('No Activities');
+    // Return a message as an array for consistency
   }
 
-  // Return all results after processing all bookings
+  var activitiesData = manifestData.response.methodResponse.activities.activity;
+  var manifestActivityDate = manifestData.response.methodResponse.manifestDate;
+
+  activitiesData = Array.isArray(activitiesData) ? activitiesData : [activitiesData];
+  
+  // Check if there are actually no activities after normalization
+  if (activitiesData.length === 0) {
+    console.log("No Normalized activities for the day");
+    logToFile("No Normalized activities for the day");
+    processErrors.push('No Activities');
+    // Return a message as an array for consistency
+  }
+
+  if(processErrors.length > 0){
+    return processErrors;
+  }
+  
+  // Initialize an array to collect all results
+  let allResults = [];
+
+  // Process each activity
+  try {
+    console.log('GETTING/SETTING ALL ACTIVITIES');
+    logToFile('GETTING/SETTING ALL ACTIVITIES');
+    for (const activityData of activitiesData) {
+      const [activity, _] = await db.activities.findOrCreate({
+        where: {
+          zauiactivityid: activityData.activityId,
+          activityname: activityData.activityName
+        },
+        defaults: {
+          zauiactivityid: activityData.activityId,
+          activityname: activityData.activityName
+        }
+      });
+
+      let bookings = Array.isArray(activityData.allBookings.booking) ? activityData.allBookings.booking : [activityData.allBookings.booking];
+
+      console.log('GETTING/SETTING ALL BOOKINGS');
+      logToFile('GETTING/SETTING ALL BOOKINGS');
+      for (const booking of bookings) {
+        // Use a self-executing async function to allow await within the loop
+        const bookingResult = await (async () => {
+          try {
+            return await db.sequelize.transaction(async (transaction) => {
+              console.log(`Processing Booking:`, booking);
+              logToFile(`Processing Booking: ${JSON.stringify(booking)}`);
+
+              const [person, personCreated] = await db.persons.findOrCreate({
+                where: {
+                  email: booking.email,
+                  firstname: booking.guestFirstName,
+                  lastname: booking.guestLastName
+                },
+                defaults: {
+                  firstname: booking.guestFirstName,
+                  lastname: booking.guestLastName,
+                  mobilephone: booking.mobile && typeof booking.mobile === 'string' ? booking.mobile.replace(/[^0-9]/g, '') : 9999999999
+                  // other person fields
+                },
+                transaction
+              });
+
+              console.log(`Person ${personCreated ? 'created' : 'found'}:`, person);
+              logToFile(`Person ${personCreated ? 'created' : 'found'}: ${JSON.stringify(person)}`);
+
+              let client = personCreated ? 
+                          await db.clients.create({ personid: person.personid }, { transaction }) : 
+                          await db.clients.findOne({ where: { personid: person.personid }, transaction });
+
+              console.log('Client:', client);
+              logToFile(`Client: ${JSON.stringify(client)}`);
+
+              // Handle Custom Fields
+              console.log('GETTING/SETTING GUEST');
+              logToFile('GETTING/SETTING GUEST');
+              const guestProfile = await getGuestProfile(booking);
+
+              if (guestProfile && guestProfile.response.methodResponse.guestDetails && guestProfile.response.methodResponse.guestDetails.userCustomFields) {
+                console.log('GUEST DETAILS BELOW')
+                logToFile('GUEST DETAILS BELOW');
+                console.log(guestProfile.response.methodResponse.guestDetails);
+                logToFile(JSON.stringify(guestProfile.response.methodResponse.guestDetails));
+                for (const field of guestProfile.response.methodResponse.guestDetails.userCustomFields.customField) {
+                  const fieldValue = typeof field.customFieldValue === 'object' ? JSON.stringify(field.customFieldValue) : field.customFieldValue;
+          
+                  // Ensure the field value length does not exceed 255 characters
+                  const truncatedFieldValue = fieldValue.substring(0, 255);
+
+                  let customFieldOption = await db.customFieldOptions.findOne({
+                    where: { field_name: field.customFieldLabel }
+                  });
+
+                  // If not found, try a "like" search
+                  if (!customFieldOption) {
+                    customFieldOption = await db.customFieldOptions.findOne({
+                      where: {
+                        field_name: {
+                          [db.Sequelize.Op.like]: `%${field.customFieldLabel}%`
+                        }
+                      }
+                    });
+                  }
+
+                  // If still not found, create a new customFieldOption
+                  if (!customFieldOption) {
+                    console.log(`Custom field option not found for label: ${field.customFieldLabel}, creating new.`);
+                    logToFile(`Custom field option not found for label: ${field.customFieldLabel}, creating new.`);
+                    customFieldOption = await db.customFieldOptions.create({
+                      field_name: field.customFieldLabel
+                    });
+                  }
+
+                  const [customField, created] = await db.personCustomFields.findOrCreate({
+                    where: {
+                      personid: person.personid,
+                      custom_field_option_id: customFieldOption.id
+                    },
+                    defaults: {
+                      field_name: field.customFieldLabel, 
+                      field_value: truncatedFieldValue,
+                      custom_field_option_id: customFieldOption.id
+                    },
+                    transaction
+                  });
+
+                  if (!created) {
+                    // If the custom field exists, update the field_value (and field_name if needed)
+                    await customField.update({
+                      field_name: field.customFieldLabel, // Optionally update the field name as well
+                      field_value: fieldValue,
+                      custom_field_option_id: customFieldOption.id // This should remain the same but included for completeness
+                    }, { transaction });
+                  }
+                }
+              }
+
+              console.log('SETTING PERSON WEIGHT');
+              logToFile('SETTING PERSON WEIGHT');
+              const weightCustomField = await db.personCustomFields.findOne({
+                where: {
+                  personid: person.personid,
+                  custom_field_option_id: 57 // Assuming 57 is the ID for the weight custom field
+                },
+                transaction
+              });
+
+              if (weightCustomField) {
+                let sanitizedWeightValue = weightCustomField.field_value;
+
+                // Check if the weight includes 'lbs'. If so, remove 'lbs' from the string.
+                if (sanitizedWeightValue.toLowerCase().includes('lbs')) {
+                  sanitizedWeightValue = sanitizedWeightValue.replace(/lbs/gi, '').trim();
+                }
+
+                // Check if the weight includes 'kg'. If so, remove 'kg', convert it to pounds.
+                if (sanitizedWeightValue.toLowerCase().includes('kg')) {
+                  sanitizedWeightValue = sanitizedWeightValue.replace(/kg/gi, '').trim();
+                  // Convert kilograms to pounds
+                  sanitizedWeightValue = parseFloat(sanitizedWeightValue) * 2.20462;
+                }
+
+                // Ensure the weight is a number before updating. If not a number, default to a safe value.
+                sanitizedWeightValue = isNaN(parseFloat(sanitizedWeightValue)) ? 0 : parseFloat(sanitizedWeightValue);
+                sanitizedWeightValue = Math.round(sanitizedWeightValue);
+
+                // Update the person's weight with the sanitized and possibly converted value
+                await person.update({
+                  weight: sanitizedWeightValue
+                }, { transaction });
+
+                console.log(`Person weight set to ${sanitizedWeightValue}`);
+                logToFile(`Person weight set to ${sanitizedWeightValue}`);
+              }
+
+              const [reservation, reservationCreated] = await db.reservation.findOrCreate({
+                where: { zauireservationid: booking.bookingNumber },
+                defaults: {
+                  personid: person.personid,
+                  activitydate: manifestActivityDate || new Date().toISOString().slice(0, 10), //will default to today if there's no activity date
+                  balanceowing: booking.outstandingBalance,
+                  zauireservationid: booking.bookingNumber,
+                  activityid: activity.activityid
+                },
+                transaction
+              });
+
+              console.log(`Reservation ${reservationCreated ? 'created' : 'found'}:`, reservation);
+              logToFile(`Reservation ${reservationCreated ? 'created' : 'found'}: ${JSON.stringify(reservation)}`);
+
+              await db.reservationDetails.create({
+                reservationid: reservation.reservationid,
+                activityid: activity.activityid
+                // Add other relevant fields and defaults for reservationDetails here
+              }, { transaction });
+
+              return { person, client, reservation };
+            });
+          } catch (error) {
+            console.error("Error processing booking:", error);
+            logToFile(`Error processing booking: ${error}`);
+            return error;
+          }
+        })();
+        // Collect results for each booking
+        allResults.push(bookingResult);
+      }
+    }
+
+    // Return all results after processing all bookings
     return allResults.flat().filter(result => result !== null);
   } catch (error) {
     console.error("Error in processing all activities and bookings:", error);
+    logToFile(`Error in processing all activities and bookings: ${error}`);
     return error;
   }
 }
+
 
 
 async function getGuestProfile(booking) {
