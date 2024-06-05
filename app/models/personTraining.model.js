@@ -49,10 +49,6 @@ module.exports = (sequelize, Sequelize) => {
             foreignKey: 'personid',
             as: 'person'
         });
-        PersonTraining.belongsTo(models.TrainingType, {
-            foreignKey: 'trainingtypeid',
-            as: 'trainingType'
-        });
     };
 
     return PersonTraining;
