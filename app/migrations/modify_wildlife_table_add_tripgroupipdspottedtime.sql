@@ -7,18 +7,19 @@ BEGIN
         WHERE table_name='wildlife' 
         AND column_name='tripgroupid'
     ) THEN
-        ALTER TABLE wildlife
-        ADD COLUMN tripgroupid INTEGER REFERENCES trip_groups(trip_group_id);
+        EXECUTE 'ALTER TABLE wildlife ADD COLUMN tripgroupid INTEGER REFERENCES trip_groups(trip_group_id)';
     END IF;
-    
+END $$;
+
+DO $$
+BEGIN
     -- Check if spottedTime column exists before adding
     IF NOT EXISTS (
         SELECT 1
         FROM information_schema.columns 
         WHERE table_name='wildlife' 
-        AND column_name='spottedTime'
+        AND column_name='spottedtime'
     ) THEN
-        ALTER TABLE wildlife
-        ADD COLUMN spottedTime TIMESTAMP;
+        EXECUTE 'ALTER TABLE wildlife ADD COLUMN spottedtime TIMESTAMP';
     END IF;
 END $$;

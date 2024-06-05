@@ -51,6 +51,8 @@ module.exports = app => {
     // Route to fetch shuttle details for multiple trip clients
     router.post("/shuttles", trips.fetchTripShuttles);
 
+    // New route for updating training
+    router.post("/updateTraining", trips.updateTraining);
 
     app.use('/api/trips', router);
 };
