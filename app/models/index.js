@@ -51,7 +51,7 @@ db.zones = require('./zones.model.js')(sequelize, Sequelize);
 db.tripruns = require('./tripruns.model.js')(sequelize, Sequelize); 
 db.wildlife = require('./wildlife.model.js')(sequelize, Sequelize);
 db.persontraining = require('./personTraining.model.js')(sequelize, Sequelize); 
-db.trainingtype = require('./trainingType.model.js')(sequelize, Sequelize);
+//db.trainingtype = require('./trainingType.model.js')(sequelize, Sequelize);
 
 // Define associations
 db.persons.hasMany(db.personhealth, { foreignKey: 'personid', as: 'personhealth' });
@@ -130,7 +130,7 @@ db.persons.hasMany(db.wildlife, { foreignKey: 'observerid', as: 'wildlifeSightin
 
 db.persons.hasMany(db.persontraining, { foreignKey: 'personid', as: 'trainings' });
 db.persontraining.belongsTo(db.persons, { foreignKey: 'personid', as: 'person' });
-db.persontraining.belongsTo(db.trainingtype, { foreignKey: 'trainingtypeid', as: 'trainingType' });
+//db.persontraining.belongsTo(db.trainingtype, { foreignKey: 'trainingtypeid', as: 'trainingType' });
 
 db.trips.belongsToMany(db.clients, {
     through: db.tripClients,
