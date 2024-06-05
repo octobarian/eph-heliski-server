@@ -911,18 +911,19 @@ exports.updateTraining = async (req, res) => {
         const existingTraining = await PersonTraining.findOne({
             where: {
                 personid: personid,
-                trainingtypeid: trainingtypeid,
-                trainingdate: trainingdate
+                trainingtypeid: trainingtypeid
             }
         });
 
         if (existingTraining) {
-            return res.status(400).send({
-                message: "This person is already trained with the specified training type."
-            });
+            // Update the existing training entry with the new date
+            existingTraining.trainingdate = trainingdate;
+            await existingTraining.save();
+
+            return res.status(200).send(existingTraining);
         }
 
-        // Create a new training entry
+        // Create a new training entry if no existing training was found
         const newTraining = await PersonTraining.create({
             personid: personid,
             trainingtypeid: trainingtypeid,
@@ -940,4 +941,5 @@ exports.updateTraining = async (req, res) => {
         });
     }
 };
+
 // Other existing or needed endpoints for trips
