@@ -6,6 +6,8 @@ const Trip = db.trips;
 const Staff = db.staffs;
 const Helicopter = db.helicopters;
 const Person = db.persons;
+const PersonTraining = db.persontraining;
+const TrainingType = db.trainingtype;
 const TripStaff = db.tripStaff;
 const TripClient = db.tripClients;
 const TripGroup = db.tripGroups;
@@ -353,7 +355,6 @@ exports.findByDate = (req, res) => {
             ]
         },
         include: [
-            //Information contained within a trip: Helicopter, Staff(Pilot), TripStaff->Staff(guide)
             {
                 model: Helicopter,
                 as: 'helicopter',
@@ -386,9 +387,8 @@ exports.findByDate = (req, res) => {
                     ]
                 }
             },
-            //Gather the groups associated to the trip via the trip_group_id
             {
-                model: TripGroup, 
+                model: TripGroup,
                 as: 'tripGroups',
                 required: false,
                 where: {
@@ -399,7 +399,7 @@ exports.findByDate = (req, res) => {
                 },
                 include: [
                     {
-                        model: TripClient, 
+                        model: TripClient,
                         as: 'tripClients',
                         include: [
                             {
@@ -409,15 +409,27 @@ exports.findByDate = (req, res) => {
                                     {
                                         model: Person,
                                         as: 'person',
-                                        attributes: ['firstname', 'lastname', 'weight', 'personid', 'dateofbirth'] // Select only required attributes
+                                        attributes: ['firstname', 'lastname', 'weight', 'personid', 'dateofbirth'],
+                                        include: [
+                                            {
+                                                model: PersonTraining,
+                                                as: 'trainings',
+                                                include: [
+                                                    {
+                                                        model: TrainingType,
+                                                        as: 'trainingType'
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ],
                                 attributes: ['reservationid'],
                             },
                             {
-                                model: db.beacons, 
-                                as: 'beacon', 
-                                attributes: ['beaconid', 'beaconnumber'], 
+                                model: db.beacons,
+                                as: 'beacon',
+                                attributes: ['beaconid', 'beaconnumber'],
                                 where: { active: true },
                                 required: false
                             }
@@ -438,7 +450,7 @@ exports.findByDate = (req, res) => {
                     }
                 ],
                 attributes: ['trip_group_id', 'start_date', 'end_date'],
-                order: ['trip_group_id','ASC']
+                order: ['trip_group_id', 'ASC']
             },
         ],
         order: [
@@ -448,35 +460,38 @@ exports.findByDate = (req, res) => {
     .then(data => {
         const formattedData = data.map(trip => {
             const pilot = trip.pilot ? {
-                staffid: trip.pilotid, // Including pilotid
+                staffid: trip.pilotid,
                 firstname: trip.pilot.person.firstname,
                 lastname: trip.pilot.person.lastname
             } : null;
-    
+
             const helicopter = trip.helicopter ? {
-                helicopterid: trip.helicopterid, // Including helicopterid
+                helicopterid: trip.helicopterid,
                 model: trip.helicopter.model,
                 callsign: trip.helicopter.callsign
             } : null;
-    
+
             const groups = trip.tripGroups.map(group => {
                 const guide = group.guide ? {
                     guideid: group.guide.staffid,
                     firstname: group.guide.person.firstname,
                     lastname: group.guide.person.lastname
                 } : null;
-    
+
                 const clients = group.tripClients.map(client => {
-                    //console.log('Processing client:', client.tripclientid); // Log the trip client ID being processed
-                    
-                    // Check if client has reservation and person data
                     const hasReservation = !!client.reservation;
-                    //console.log(`Client ${client.tripclientid} has reservation:`, hasReservation);
-                    
-                    if (hasReservation) {
-                        //console.log(`Reservation details for client ${client.tripclientid}:`, client.reservation);
-                    }
-                
+
+                    const trainings = hasReservation ? client.reservation.person.trainings.map(training => {
+                        const trainingData = training.dataValues;
+                        const trainingType = trainingData.trainingType ? trainingData.trainingType.dataValues : {};
+                        console.log(trainingData);
+                        return {
+                            trainingtypeid: trainingData.trainingtyp,
+                            trainingname: trainingType.trainingname || null,
+                            trainingdate: trainingData.trainingdat || null,
+                        };
+                    }) : [];
+
                     return {
                         tripClientId: client.tripclientid,
                         reservationId: hasReservation ? client.reservation.reservationid : null,
@@ -485,29 +500,30 @@ exports.findByDate = (req, res) => {
                             lastname: client.reservation.person.lastname,
                             weight: client.reservation.person.weight,
                             id: client.reservation.person.personid,
-                            age: calculateAge(client.reservation.person.dateofbirth), 
+                            age: calculateAge(client.reservation.person.dateofbirth),
+                            trainings: trainings
                         } : null,
                         beacon: client.beacon ? {
                             beaconid: client.beacon.beaconid,
                             beaconnumber: client.beacon.beaconnumber,
                         } : null
-                    }; 
+                    };
                 });
-                
+
                 return {
-                    groupid: group.trip_group_id?group.trip_group_id:null,
-                    start_date: group.start_date, 
+                    groupid: group.trip_group_id ? group.trip_group_id : null,
+                    start_date: group.start_date,
                     end_date: group.end_date,
                     guide: guide,
                     clients: clients,
                     noteContent: group.note ? group.note.text : ''
                 };
             });
-    
+
             return {
                 tripId: trip.tripid,
                 date: trip.date,
-                start_date: trip.start_date, 
+                start_date: trip.start_date,
                 end_date: trip.end_date,
                 totalVertical: trip.totalvertical,
                 triptype: trip.triptype,
@@ -522,18 +538,21 @@ exports.findByDate = (req, res) => {
         console.error("Error occurred while retrieving trips:", err);
         console.error("Error Details:", err.message);
         console.error("Stack Trace:", err.stack);
-    
-        // If possible, log specific details to help isolate the issue
-        if(err instanceof Sequelize.EagerLoadingError) {
+
+        if (err instanceof Sequelize.EagerLoadingError) {
             console.error("EagerLoadingError: Issue with one of the 'include' statements.");
         }
-    
+
         res.status(500).send({
             message: "An error occurred while trying to fetch trips.",
             errorDetails: err.message,
         });
     });
 };
+
+
+
+
 
 exports.deleteGroup = async (req, res) => {
     const groupId = req.params.groupId;
@@ -883,4 +902,44 @@ exports.fetchTripShuttles = async (req, res) => {
         res.status(500).send({ message: "Error fetching trip shuttles." });
     }
 };
+
+exports.updateTraining = async (req, res) => {
+    try {
+        const { personid, trainingtypeid, trainingdate } = req.body;
+
+        // Check if the person is already trained with the specified training type
+        const existingTraining = await PersonTraining.findOne({
+            where: {
+                personid: personid,
+                trainingtypeid: trainingtypeid
+            }
+        });
+
+        if (existingTraining) {
+            // Update the existing training entry with the new date
+            existingTraining.trainingdate = trainingdate;
+            await existingTraining.save();
+
+            return res.status(200).send(existingTraining);
+        }
+
+        // Create a new training entry if no existing training was found
+        const newTraining = await PersonTraining.create({
+            personid: personid,
+            trainingtypeid: trainingtypeid,
+            trainingdate: trainingdate,
+            trainingfor: 'Alpine',
+            isplaceholder: false
+        });
+
+        res.status(201).send(newTraining);
+    } catch (error) {
+        console.error("Error occurred while updating training:", error);
+        res.status(500).send({
+            message: "An error occurred while updating training.",
+            errorDetails: error.message
+        });
+    }
+};
+
 // Other existing or needed endpoints for trips
