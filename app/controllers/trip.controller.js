@@ -413,13 +413,7 @@ exports.findByDate = (req, res) => {
                                         include: [
                                             {
                                                 model: PersonTraining,
-                                                as: 'trainings',
-                                                include: [
-                                                    {
-                                                        model: TrainingType,
-                                                        as: 'trainingType'
-                                                    }
-                                                ]
+                                                as: 'trainings'
                                             }
                                         ]
                                     }
@@ -483,10 +477,9 @@ exports.findByDate = (req, res) => {
 
                     const trainings = hasReservation ? client.reservation.person.trainings.map(training => {
                         const trainingData = training.dataValues;
-                        console.log(trainingData);
                         return {
-                            trainingtypeid: trainingData.trainingtyp,
-                            trainingdate: trainingData.trainingdat || null,
+                            trainingtypeid: trainingData.trainingtyp || trainingData.trainingtypeid || null,
+                            trainingdate: trainingData.trainingdat || trainingData.trainingdate || null,
                         };
                     }) : [];
 
