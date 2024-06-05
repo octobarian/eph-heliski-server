@@ -483,11 +483,9 @@ exports.findByDate = (req, res) => {
 
                     const trainings = hasReservation ? client.reservation.person.trainings.map(training => {
                         const trainingData = training.dataValues;
-                        const trainingType = trainingData.trainingType ? trainingData.trainingType.dataValues : {};
                         console.log(trainingData);
                         return {
                             trainingtypeid: trainingData.trainingtyp,
-                            trainingname: trainingType.trainingname || null,
                             trainingdate: trainingData.trainingdat || null,
                         };
                     }) : [];
