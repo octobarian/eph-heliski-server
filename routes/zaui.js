@@ -198,7 +198,8 @@ router.post("/check-zaui-mapping", async (req, res) => {
       console.log(manifest.response.response);
     }
 
-    const activities = manifest.response.response.methodResponse.activities.activity;
+    const activitiesData = manifest.response.response.methodResponse.activities;
+    const activities = activitiesData && activitiesData.activity ? activitiesData.activity : null;
 
     if (!activities) {
       // If no activities are found for the given date, return a specific message
@@ -208,8 +209,10 @@ router.post("/check-zaui-mapping", async (req, res) => {
       console.log(manifest.response.response);
     }
 
+    const normalizedActivities = Array.isArray(activities) ? activities : [activities];
+
     // Step 2: Parse the JSON response and extract booking numbers
-    for (const activity of activities) {
+    for (const activity of normalizedActivities) {
       let bookings = activity.allBookings.booking;
       
       // Ensure bookings is an array
@@ -244,6 +247,7 @@ router.post("/check-zaui-mapping", async (req, res) => {
   }
 });
 
+ 
 
 // OLD MAPPING CODE 2024-03-22:
 // async function mapManifestToDBSchema(manifestData) {
@@ -389,14 +393,21 @@ router.post("/check-zaui-mapping", async (req, res) => {
 //   }
 // }
 
-function logToFile(message) {
-  const logFilePath = path.join(__dirname, 'log.txt');
-  fs.appendFileSync(logFilePath, message + '\n', 'utf8');
+function logToFile(message, overwrite = false) {
+  const logging = true;
+  if (logging) {
+    const logFilePath = path.join(__dirname, 'log.txt');
+    if (overwrite) {
+      fs.writeFileSync(logFilePath, message + '\n', 'utf8');
+    } else {
+      fs.appendFileSync(logFilePath, message + '\n', 'utf8');
+    }
+  }
 }
 
 async function mapManifestToDBSchema(manifestData) {
   console.log("BEGIN MAPPING MANIFEST");
-  logToFile("BEGIN MAPPING MANIFEST");
+  logToFile("BEGIN MAPPING MANIFEST", true); // Overwrite log at the start
   var processErrors = [];
   
   // Check if activities are present
@@ -494,7 +505,8 @@ async function mapManifestToDBSchema(manifestData) {
                   const fieldValue = typeof field.customFieldValue === 'object' ? JSON.stringify(field.customFieldValue) : field.customFieldValue;
           
                   // Ensure the field value length does not exceed 255 characters
-                  const truncatedFieldValue = fieldValue.substring(0, 255);
+                  //const truncatedFieldValue = fieldValue.substring(0, 255);
+                  const truncatedFieldValue = fieldValue
 
                   let customFieldOption = await db.customFieldOptions.findOne({
                     where: { field_name: field.customFieldLabel }
@@ -546,44 +558,51 @@ async function mapManifestToDBSchema(manifestData) {
 
               console.log('SETTING PERSON WEIGHT');
               logToFile('SETTING PERSON WEIGHT');
-              const weightCustomField = await db.personCustomFields.findOne({
-                where: {
-                  personid: person.personid,
-                  custom_field_option_id: 57 // Assuming 57 is the ID for the weight custom field
-                },
-                transaction
-              });
 
-              if (weightCustomField) {
-                let sanitizedWeightValue = weightCustomField.field_value;
+              if (!person.weight) { // Check if weight is not already set
+                const weightCustomField = await db.personCustomFields.findOne({
+                  where: {
+                    personid: person.personid,
+                    custom_field_option_id: 57 // Assuming 57 is the ID for the weight custom field
+                  },
+                  transaction
+                });
 
-                // Check if the weight includes 'lbs'. If so, remove 'lbs' from the string.
-                if (sanitizedWeightValue.toLowerCase().includes('lbs')) {
-                  sanitizedWeightValue = sanitizedWeightValue.replace(/lbs/gi, '').trim();
+                if (weightCustomField) {
+                  let sanitizedWeightValue = weightCustomField.field_value;
+
+                  // Check if the weight includes 'lbs'. If so, remove 'lbs' from the string.
+                  if (sanitizedWeightValue.toLowerCase().includes('lbs')) {
+                    sanitizedWeightValue = sanitizedWeightValue.replace(/lbs/gi, '').trim();
+                  }
+
+                  // Check if the weight includes 'kg'. If so, remove 'kg', convert it to pounds.
+                  if (sanitizedWeightValue.toLowerCase().includes('kg')) {
+                    sanitizedWeightValue = sanitizedWeightValue.replace(/kg/gi, '').trim();
+                    // Convert kilograms to pounds
+                    sanitizedWeightValue = parseFloat(sanitizedWeightValue) * 2.20462;
+                  }
+
+                  // Ensure the weight is a number before updating. If not a number, default to a safe value.
+                  sanitizedWeightValue = isNaN(parseFloat(sanitizedWeightValue)) ? 0 : parseFloat(sanitizedWeightValue);
+                  sanitizedWeightValue = Math.round(sanitizedWeightValue);
+
+                  // Update the person's weight with the sanitized and possibly converted value
+                  await person.update({
+                    weight: sanitizedWeightValue
+                  }, { transaction });
+
+                  console.log(`Person weight set to ${sanitizedWeightValue}`);
+                  logToFile(`Person weight set to ${sanitizedWeightValue}`);
                 }
-
-                // Check if the weight includes 'kg'. If so, remove 'kg', convert it to pounds.
-                if (sanitizedWeightValue.toLowerCase().includes('kg')) {
-                  sanitizedWeightValue = sanitizedWeightValue.replace(/kg/gi, '').trim();
-                  // Convert kilograms to pounds
-                  sanitizedWeightValue = parseFloat(sanitizedWeightValue) * 2.20462;
-                }
-
-                // Ensure the weight is a number before updating. If not a number, default to a safe value.
-                sanitizedWeightValue = isNaN(parseFloat(sanitizedWeightValue)) ? 0 : parseFloat(sanitizedWeightValue);
-                sanitizedWeightValue = Math.round(sanitizedWeightValue);
-
-                // Update the person's weight with the sanitized and possibly converted value
-                await person.update({
-                  weight: sanitizedWeightValue
-                }, { transaction });
-
-                console.log(`Person weight set to ${sanitizedWeightValue}`);
-                logToFile(`Person weight set to ${sanitizedWeightValue}`);
+              } else {
+                console.log(`Person weight already set to ${person.weight}, skipping update.`);
+                logToFile(`Person weight already set to ${person.weight}, skipping update.`);
               }
 
+
               const [reservation, reservationCreated] = await db.reservation.findOrCreate({
-                where: { zauireservationid: booking.bookingNumber },
+                where: { zauireservationid: booking.bookingNumber, activitydate: manifestActivityDate },
                 defaults: {
                   personid: person.personid,
                   activitydate: manifestActivityDate || new Date().toISOString().slice(0, 10), //will default to today if there's no activity date
@@ -597,11 +616,15 @@ async function mapManifestToDBSchema(manifestData) {
               console.log(`Reservation ${reservationCreated ? 'created' : 'found'}:`, reservation);
               logToFile(`Reservation ${reservationCreated ? 'created' : 'found'}: ${JSON.stringify(reservation)}`);
 
-              await db.reservationDetails.create({
-                reservationid: reservation.reservationid,
-                activityid: activity.activityid
+              const [reservationdetails, reservationdetailsCreated] = await db.reservationDetails.findOrCreate({
+                where: { reservationid: reservation.reservationid},
+                defaults:{
+                  reservationid: reservation.reservationid,
+                  activityid: activity.activityid
+                },
+                transaction 
                 // Add other relevant fields and defaults for reservationDetails here
-              }, { transaction });
+              });
 
               return { person, client, reservation };
             });
