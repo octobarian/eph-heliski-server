@@ -35,6 +35,7 @@ exports.dailyTripsReport = (req, res) => {
     // Get the date from the query parameters, default to today's date if not provided
     const date = req.query.date || new Date().toISOString().slice(0, 10);
 
+
     Trip.findAll({
         where: {
             [Op.and]: [
@@ -110,15 +111,28 @@ exports.dailyTripsReport = (req, res) => {
         order: [['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
     })
     .then(trips => {
-        // Ensure trips and groups are sorted
-        const sortedTrips = trips.sort((a, b) => a.tripid - b.tripid);
-        const reportData = sortedTrips.map((trip, tripIndex) => {
-            const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
+
+        trips.forEach((trip, tripIndex) => {
+            console.log(`Trip ${tripIndex + 1}:`);
+            trip.tripGroups.forEach((group, groupIndex) => {
+                console.log(`  Group ${groupIndex + 1}:`);
+                group.tripClients.forEach((client, clientIndex) => {
+                    const person = client.reservation.person;
+                    console.log(`    Client ${clientIndex + 1}: ${person.firstname}`);
+                    person.customFields.forEach(cf => {
+                        console.log(`      Custom Field: ID=${cf.dataValues.custom_f}, Name=${cf.dataValues.field_na}, Value=${cf.dataValues.field_va}`);
+                    });
+                });
+            });
+        });
+
+        // Transform the Sequelize data into the format expected by the report generator
+        const reportData = trips.map((trip, tripIndex) => {
             return {
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname || 'Unknown'} ${trip.pilot.person.lastname || 'Pilot'}` : 'No pilot',
                 heliIndex: tripIndex + 1,
-                groups: sortedGroups.map((group, groupIndex) => {
+                groups: trip.tripGroups.map((group, groupIndex) => {
                     return {
                         groupId: group.trip_group_id || 'N/A',
                         groupIndex: groupIndex + 1,
@@ -127,11 +141,11 @@ exports.dailyTripsReport = (req, res) => {
                             let hasMedicalField = false;
                             let hasDietaryField = false;
                             let hasRiderType = '';
-
+                            
                             person.customFields.forEach(cf => {
                                 const fieldID = cf.dataValues.custom_f;
                                 const fieldValue = cf.dataValues.field_va;
-
+                                
                                 // Function to check if the field value is meaningful
                                 const isMeaningfulValue = (value) => {
                                     if (!value) return false; // Handles null, undefined, and empty string
@@ -139,17 +153,17 @@ exports.dailyTripsReport = (req, res) => {
                                     // Check against 'no' and '{}' considering potential whitespace
                                     return lowerValue.trim() !== 'no' && lowerValue.trim() !== '{}';
                                 };
-
+                            
                                 // Check for medical field presence and non-'No' and not '{}' value
                                 if ([30, 25, 26].includes(fieldID) && isMeaningfulValue(fieldValue)) {
                                     hasMedicalField = true;
                                 }
-
+                            
                                 // Check for dietary field presence and non-'No' and not '{}' value
                                 if ([29, 31].includes(fieldID) && isMeaningfulValue(fieldValue)) {
                                     hasDietaryField = true;
                                 }
-                                // Check ski or snowboard
+                                // check ski or snowboard
                                 if ([52].includes(fieldID) && fieldValue) {
                                     hasRiderType = fieldValue;
                                 }
@@ -184,7 +198,6 @@ exports.dailyTripsReport = (req, res) => {
         });
     });
 };
-
 
 
 exports.medicalReport = (req, res) => {
@@ -256,6 +269,7 @@ exports.medicalReport = (req, res) => {
     }).then(trips => {
 
         const customFieldToReportHeaderMapping = {
+            6: 'Medical Con',
             25: "Allergy RX",
             26: "Allergy RX",
             27: "Prescriptions",
@@ -285,9 +299,27 @@ exports.medicalReport = (req, res) => {
                             const mappedCustomFields = {};
                             person.customFields.forEach(cf => {
                                 const header = customFieldToReportHeaderMapping[cf.dataValues.custom_f];
-                                if (header) {
-                                    // Concatenate field values if multiple fields map to the same header
-                                    mappedCustomFields[header] = (mappedCustomFields[header] || '') + cf.dataValues.field_va + '; ';
+                                let fieldValue = cf.dataValues.field_va;
+
+                                // Clean up the field values
+                                if (header === 'Medical Con' && (fieldValue === 'No Medical Conditions' || fieldValue === '{}')) {
+                                    fieldValue = '';
+                                }
+                                if (header === 'Diet Restrict' && (fieldValue === 'No' || fieldValue === 'No Dietary Restrictions' || fieldValue === '{}')) {
+                                    fieldValue = '';
+                                }
+                                if (header === 'Allergy RX' && (fieldValue.toLowerCase().includes('none') || fieldValue.toLowerCase().includes('no allergies to rx') || fieldValue === '{}')) {
+                                    fieldValue = '';
+                                }
+                                if (header === 'Severity' && fieldValue === '{}') {
+                                    fieldValue = '';
+                                }
+                                if (header === 'Prescriptions' && (fieldValue === 'None' || fieldValue === 'No Prescriptions' || fieldValue === '{}')) {
+                                    fieldValue = '';
+                                }
+
+                                if (header && fieldValue) {
+                                    mappedCustomFields[header] = (mappedCustomFields[header] || '') + fieldValue + '; ';
                                 }
                             });
 
@@ -563,4 +595,264 @@ exports.dailyShuttleReport = async (req, res) => {
     }
 };
 
+
+exports.groupListReport = (req, res) => {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+
+    Trip.findAll({
+        where: {
+            [Op.and]: [
+                { start_date: { [Op.lte]: date } },
+                { end_date: { [Op.gte]: date } }
+            ]
+        },
+        include: [
+            {
+                model: Helicopter,
+                as: 'helicopter',
+            },
+            {
+                model: Staff,
+                as: 'pilot',
+                include: {
+                    model: Person,
+                    as: 'person',
+                    attributes: ['firstname', 'lastname'],
+                },
+                attributes: ['staffid'],
+            },
+            {
+                model: TripGroup,
+                as: 'tripGroups',
+                include: [
+                    {
+                        model: TripClient,
+                        as: 'tripClients',
+                        include: [
+                            {
+                                model: Reservation,
+                                as: 'reservation',
+                                include: [{
+                                    model: Person,
+                                    as: 'person',
+                                    attributes: ['firstname', 'lastname', 'weight', 'personid'],
+                                    include: [{
+                                        model: PersonCustomField,
+                                        as: 'customFields',
+                                        attributes: [['custom_field_option_id', 'custom_f'], ['field_name', 'field_na'], ['field_value', 'field_va']],
+                                        required: false
+                                    }]
+                                }],
+                                attributes: ['reservationid']
+                            },
+                            {
+                                model: Beacon,
+                                as: 'beacon',
+                                attributes: ['beaconid', 'beaconnumber'],
+                                where: { active: true },
+                                required: false
+                            }
+                        ],
+                        attributes: ['tripclientid']
+                    },
+                    {
+                        model: Staff,
+                        as: 'guide',
+                        include: {
+                            model: Person,
+                            as: 'person',
+                            attributes: ['firstname', 'lastname'],
+                        },
+                        attributes: ['staffid'],
+                    }
+                ],
+                attributes: ['trip_group_id', 'start_date', 'end_date']
+            },
+        ],
+        order: [['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
+    })
+    .then(trips => {
+        const reportData = trips.map((trip, tripIndex) => {
+            const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
+            return {
+                helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
+                pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
+                heliIndex: tripIndex + 1,
+                groups: sortedGroups.map((group, groupIndex) => {
+                    const guide = group.guide ? `${group.guide.person.firstname} ${group.guide.person.lastname}` : 'No guide';
+                    const clients = group.tripClients.map(tc => {
+                        const person = tc.reservation.person;
+                        let hasAllergies = false;
+
+                        person.customFields.forEach(cf => {
+                            const fieldID = cf.dataValues.custom_f;
+                            const fieldValue = cf.dataValues.field_va;
+
+                            const isMeaningfulValue = (value) => {
+                                if (!value) return false;
+                                const lowerValue = value.toLowerCase();
+                                return lowerValue.trim() !== 'no' && lowerValue.trim() !== '{}';
+                            };
+
+                            if ([25, 26].includes(fieldID) && isMeaningfulValue(fieldValue)) {
+                                hasAllergies = true;
+                            }
+                        });
+
+                        return {
+                            lastName: person.lastname,
+                            firstName: person.firstname,
+                            weight: person.weight || 'N/A',
+                            beaconNumber: tc.beacon ? tc.beacon.beaconnumber : 'N/A',
+                            hasAllergies: hasAllergies
+                        };
+                    });
+
+                    return {
+                        guide,
+                        clients,
+                        fuelPercentage: 35.9 // Placeholder
+                    };
+                }),
+            };
+        });
+
+        res.json(reportData);
+    })
+    .catch(err => {
+        console.error("Error occurred while retrieving trips for report:", err);
+        res.status(500).send({
+            message: "An error occurred while trying to fetch trips for the report.",
+            errorDetails: err.message,
+        });
+    });
+};
+
+exports.dailyRentalReport = (req, res) => {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+
+    Trip.findAll({
+        where: {
+            [Op.and]: [
+                { start_date: { [Op.lte]: date } },
+                { end_date: { [Op.gte]: date } }
+            ]
+        },
+        include: [
+            {
+                model: Helicopter,
+                as: 'helicopter',
+            },
+            {
+                model: Staff,
+                as: 'pilot',
+                include: {
+                    model: Person,
+                    as: 'person',
+                    attributes: ['firstname', 'lastname'],
+                },
+                attributes: ['staffid'],
+            },
+            {
+                model: TripGroup,
+                as: 'tripGroups',
+                include: [
+                    {
+                        model: TripClient,
+                        as: 'tripClients',
+                        include: [
+                            {
+                                model: Reservation,
+                                as: 'reservation',
+                                include: [{
+                                    model: Person,
+                                    as: 'person',
+                                    attributes: ['firstname', 'lastname', 'weight', 'personid'],
+                                    include: [{
+                                        model: PersonCustomField,
+                                        as: 'customFields',
+                                        attributes: [
+                                            ['custom_field_option_id', 'custom_f'],
+                                            ['field_name', 'field_na'],
+                                            ['field_value', 'field_va']
+                                        ],
+                                        required: false
+                                    }]
+                                }],
+                                attributes: ['reservationid']
+                            },
+                        ],
+                        attributes: ['tripclientid']
+                    },
+                    {
+                        model: Staff,
+                        as: 'guide',
+                        include: {
+                            model: Person,
+                            as: 'person',
+                            attributes: ['firstname', 'lastname'],
+                        },
+                        attributes: ['staffid'],
+                    }
+                ],
+                attributes: ['trip_group_id', 'start_date', 'end_date']
+            },
+        ]
+    }).then(trips => {
+        const customFieldToReportHeaderMapping = {
+            46: 'Rentals',
+            42: 'Preferred Ski/Board',
+            58: 'Size'
+        };
+
+        // Ensure trips and groups are sorted
+        const sortedTrips = trips.sort((a, b) => a.tripid - b.tripid);
+        const reportData = sortedTrips.map((trip, tripIndex) => {
+            const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
+            return {
+                helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
+                pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
+                heliIndex: tripIndex + 1,
+                groups: sortedGroups.map((group, groupIndex) => {
+                    return {
+                        groupId: group.trip_group_id,
+                        groupIndex: groupIndex + 1,
+                        clients: group.tripClients.map(tc => {
+                            const person = tc.reservation.person;
+
+                            // Map the customFields to the report's expected structure
+                            const mappedCustomFields = {};
+                            person.customFields.forEach(cf => {
+                                const header = customFieldToReportHeaderMapping[cf.dataValues.custom_f];
+                                let fieldValue = cf.dataValues.field_va;
+
+                                if (header && fieldValue) {
+                                    mappedCustomFields[header] = (mappedCustomFields[header] || '') + fieldValue + '; ';
+                                }
+                            });
+
+                            return {
+                                firstName: person.firstname,
+                                lastName: person.lastname,
+                                rentals: mappedCustomFields['Rentals'] || 'No Rentals',
+                                preferredSkiBoard: mappedCustomFields['Preferred Ski/Board'] || 'N/A',
+                                size: mappedCustomFields['Size'] || 'N/A',
+                            };
+                        }),
+                        totalRentals: group.tripClients.filter(tc => tc.reservation.person.customFields.some(cf => cf.custom_field_option_id == 46 && cf.field_value !== 'No Rentals')).length // Count clients with rentals
+                    };
+                }),
+            };
+        });
+
+        res.json(reportData);
+    })
+    .catch(err => {
+        console.error("Error occurred while retrieving trips for report:", err);
+        res.status(500).send({
+            message: "An error occurred while trying to fetch trips for the report.",
+            errorDetails: err.message,
+        });
+    });
+};
 
