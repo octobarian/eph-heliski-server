@@ -3,17 +3,14 @@ module.exports = app => {
 
     var router = require("express").Router();
 
-    // Create a new Note
     router.get('/dailyTripsReport', reports.dailyTripsReport);
-
-    // Route for fetching medical report data
     router.get('/medicalReport', reports.medicalReport);
-
-    // Route for fetching lunch report data
     router.get('/lunchReport', reports.lunchReport);
-
-    // Route for fetching daily shuttle report data
     router.get('/dailyShuttleReport', reports.dailyShuttleReport);
+    
+    // New route for group list report
+    router.get('/groupListReport', reports.groupListReport);
+    router.get('/dailyRentalReport', reports.dailyRentalReport);
 
     app.use('/api/reports', router);
 };
