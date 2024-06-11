@@ -806,14 +806,20 @@ exports.dailyRentalReport = (req, res) => {
         };
 
         // Ensure trips and groups are sorted
+        var totalski =0;
+        var totalboard =0;
+        var totalRental =0;
         const sortedTrips = trips.sort((a, b) => a.tripid - b.tripid);
         const reportData = sortedTrips.map((trip, tripIndex) => {
             const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
             return {
+                //trip heli start
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
                 heliIndex: tripIndex + 1,
                 groups: sortedGroups.map((group, groupIndex) => {
+                    var groupski = 0;
+                    var groupboard = 0;
                     return {
                         groupId: group.trip_group_id,
                         groupIndex: groupIndex + 1,
@@ -825,11 +831,31 @@ exports.dailyRentalReport = (req, res) => {
                             person.customFields.forEach(cf => {
                                 const header = customFieldToReportHeaderMapping[cf.dataValues.custom_f];
                                 let fieldValue = cf.dataValues.field_va;
-
+                                
+                                // Clean up the field values
+                                if (header === 'Rentals' && fieldValue === '{}') {
+                                    fieldValue = '';
+                                }
+                                else if(header === 'Rentals' && fieldValue === 'Skis'){
+                                    groupski++;
+                                    console.log(groupski);
+                                }
+                                else if(header === 'Rentals' && fieldValue === 'Snowboard'){
+                                    groupboard++;
+                                }
+                                if (header === 'Preferred Ski/Board' && fieldValue === '{}') {
+                                    fieldValue = '';
+                                }
+                                
+                                if (header === 'Size' && fieldValue === '{}') {
+                                    fieldValue = '';
+                                }
                                 if (header && fieldValue) {
                                     mappedCustomFields[header] = (mappedCustomFields[header] || '') + fieldValue + '; ';
                                 }
                             });
+                            totalboard += groupboard;
+                            totalski += groupski;
 
                             return {
                                 firstName: person.firstname,
@@ -839,12 +865,18 @@ exports.dailyRentalReport = (req, res) => {
                                 size: mappedCustomFields['Size'] || 'N/A',
                             };
                         }),
-                        totalRentals: group.tripClients.filter(tc => tc.reservation.person.customFields.some(cf => cf.custom_field_option_id == 46 && cf.field_value !== 'No Rentals')).length // Count clients with rentals
+                        groupski: groupski,
+                        groupboard: groupboard,
+                        totalGroupRentals: groupski+groupboard,
                     };
                 }),
+                totalski: totalski,
+                totalboard: totalboard,
+                totalRental: totalski+totalboard,
             };
-        });
 
+        });
+        
         res.json(reportData);
     })
     .catch(err => {
