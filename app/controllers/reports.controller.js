@@ -838,7 +838,6 @@ exports.dailyRentalReport = (req, res) => {
                                 }
                                 else if(header === 'Rentals' && fieldValue === 'Skis'){
                                     groupski++;
-                                    console.log(groupski);
                                 }
                                 else if(header === 'Rentals' && fieldValue === 'Snowboard'){
                                     groupboard++;
