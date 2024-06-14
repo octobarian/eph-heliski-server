@@ -1,66 +1,29 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const axios = require("axios");
-const qs = require("querystring");
-  
-router.get("/", (req, res) => {
-    // token in session -> get user data and send it back to the vue app
-    if (req.session.token) {
-        axios
-            .post(
-                `${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/oauth2/introspect`,
-                qs.stringify({
-                    client_id: process.env.FUSIONAUTH_CLIENT_ID,
-                    token: req.session.token,
-                })
-            )
-            .then((result) => {
-                let introspectResponse = result.data;
-                // valid token -> get more user data and send it back to the Vue app
-                if (introspectResponse) {
+const db = require('../app/models');
+const UserLogin = db.user_logins;
 
-                    // GET request to /registration endpoint
-                    axios
-                        .get(
-                            `${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/api/user/registration/${introspectResponse.sub}/${process.env.FUSIONAUTH_APPLICATION_ID}`,
-                            {
-                                headers: {
-                                    Authorization: process.env.FUSIONAUTH_API_KEY,
-                                },
-                            }
-                        )
-                        .then((response) => {
-                            res.send({
-                                authState: "Authorized",
-                                introspectResponse: introspectResponse,
-                                body: response.data.registration,
-                            });
-                        })
-                        .catch((err) => {
-                            res.send({
-                                authState: "notAuthorized"
-                            });
-                            console.log(err)
-                            return
-                        })
-                }
-                // expired token -> send nothing
-                else {
-                    req.session.destroy();
+router.get('/', (req, res) => {
+    if (req.session.userId) {
+        UserLogin.findByPk(req.session.userId)
+            .then(user => {
+                if (user) {
                     res.send({
-                        authState: "notAuthenticated"
+                        authState: 'Authorized',
+                        email: user.email,
+                        role: user.role
                     });
+                } else {
+                    res.status(401).send({ authState: 'notAuthenticated' });
                 }
             })
-            .catch((err) => {
-                console.log(err);
+            .catch(err => {
+                console.error(err);
+                res.status(500).send({ message: 'Internal server error.' });
             });
-    }
-    // no token -> send nothing
-    else {
-        res.send({
-            authState: "notAuthenticated"
-        });
+    } else {
+        res.status(401).send({ authState: 'notAuthenticated' });
     }
 });
+
 module.exports = router;
