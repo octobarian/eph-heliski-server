@@ -77,11 +77,19 @@ app.get("/", (req, res) => {
   });
 });
 
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
+
 // Provide a default port
 const port = process.env.SERVER_PORT || 3000;
 
 async function startServer() {
   try {
+    console.log(`PORT: ${process.env.PORT}`);
+    console.log(`DB_HOST: ${process.env.DB_HOST}`);
+    console.log(`Environement is: ${environmentRuntime}`)
     await runMigrations();
     console.log('Migrations have been run successfully.');
 
