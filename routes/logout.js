@@ -1,9 +1,14 @@
 const express = require('express');
 const router = express.Router();
+
 router.get('/', (req, res) => {
-  // delete the session
-  req.session.destroy();
-  // end FusionAuth session
-  res.redirect(`${process.env.FUSIONAUTH_SERVER_IP}:${process.env.FUSIONAUTH_PORT}/oauth2/logout?client_id=${process.env.FUSIONAUTH_CLIENT_ID}`);
+    req.session.destroy(err => {
+        if (err) {
+            return res.status(500).send({ message: 'Failed to log out.' });
+        }
+        res.clearCookie('connect.sid');
+        res.send({ message: 'Logged out successfully.' });
+    });
 });
+
 module.exports = router;

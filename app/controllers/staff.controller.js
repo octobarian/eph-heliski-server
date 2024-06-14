@@ -1,8 +1,11 @@
 const db = require("../models");
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
-const Staff = db.staffs; // Make sure this matches your Staff model name
-const Person = db.persons; // Make sure this matches your Person model name
-const Job = db.jobs; // Add this line if you have a Job model and it's associated with Staff
+const Staff = db.staffs;
+const Person = db.persons;
+const Job = db.jobs;
+const UserLogin = db.user_logins; // Ensure this is imported
 
 exports.create = (req, res) => {
     // Validate request
@@ -34,10 +37,46 @@ exports.create = (req, res) => {
             // Save Staff in the database with the personid
             Staff.create(staff)
                 .then(staffData => {
-                    res.send({
-                        staff: staffData,
-                        person: personData,
-                    });
+                    // Check if canLogin is true
+                    if (req.body.canLogin) {
+                        const { email, password, role } = req.body.userLogin;
+
+                        // Hash the password
+                        bcrypt.hash(password, saltRounds, (err, hash) => {
+                            if (err) {
+                                res.status(500).send({
+                                    message: "Error hashing password."
+                                });
+                                return;
+                            }
+
+                            // Create UserLogin record
+                            UserLogin.create({
+                                email: email,
+                                password_hash: hash,
+                                role: role,
+                                staff_id: staffData.staffid
+                            })
+                            .then(userLoginData => {
+                                res.send({
+                                    staff: staffData,
+                                    person: personData,
+                                    userLogin: userLoginData
+                                });
+                            })
+                            .catch(err => {
+                                res.status(500).send({
+                                    message: "Error creating user login.",
+                                    error: err.message
+                                });
+                            });
+                        });
+                    } else {
+                        res.send({
+                            staff: staffData,
+                            person: personData,
+                        });
+                    }
                 })
                 .catch(err => {
                     // If Staff creation failed, optionally delete the Person record

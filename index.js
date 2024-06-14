@@ -10,6 +10,7 @@ const bodyParser = require("body-parser");
 const checkSecret = require("./app/middleware/checkSecret.js");
 
 const runMigrations = require('./app/controllers/dbMigrations.js');
+const createAdminUser = require('./app/controllers/insertAdmin.js');
 
 // Load the .env variables into the build
 require("dotenv").config();
@@ -76,6 +77,8 @@ async function startServer() {
   try {
     await runMigrations();
     console.log('Migrations have been run successfully.');
+
+    await createAdminUser(); // Call the function to create the admin user
 
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);

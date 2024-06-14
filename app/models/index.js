@@ -17,9 +17,9 @@ const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
 
 const db = {};
 
-db.Sequelize = Sequelize;
+db.Sequelize = Sequelize; 
 db.sequelize = sequelize;
-
+ 
 // Models/tables (ADD MODEL FOR EACH MODEL HERE)
 db.tutorials = require("./tutorial.model.js")(sequelize, Sequelize);
 db.clients = require("./client.model.js")(sequelize, Sequelize);
@@ -51,7 +51,7 @@ db.zones = require('./zones.model.js')(sequelize, Sequelize);
 db.tripruns = require('./tripruns.model.js')(sequelize, Sequelize); 
 db.wildlife = require('./wildlife.model.js')(sequelize, Sequelize);
 db.persontraining = require('./personTraining.model.js')(sequelize, Sequelize); 
-//db.trainingtype = require('./trainingType.model.js')(sequelize, Sequelize);
+db.user_logins = require('./user_login.model.js')(sequelize, Sequelize); // Add the UserLogin model
 
 // Define associations
 db.persons.hasMany(db.personhealth, { foreignKey: 'personid', as: 'personhealth' });
@@ -159,5 +159,9 @@ db.reservation.belongsToMany(db.trips, {
     otherKey: 'tripid',
     as: 'trips'
 });
+
+// UserLogin associations
+db.user_logins.belongsTo(db.staffs, { foreignKey: 'staff_id', as: 'staff' });
+db.staffs.hasMany(db.user_logins, { foreignKey: 'staff_id', as: 'logins' });
 
 module.exports = db;
