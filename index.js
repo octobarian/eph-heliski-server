@@ -16,9 +16,16 @@ const createAdminUser = require('./app/controllers/insertAdmin.js');
 require("dotenv").config();
 
 const app = express();
+const developmentAddress = process.env.DEVELOPMENT_CLIENT_ADDRESS;
+const productionAddress = process.env.AZURE_CLIENT_ADDRESS;
+const environmentRuntime = process.env.NODE_ENV;
 
-// Use our middlewares
-app.use(cors({ origin: true, credentials: true }));
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' ? productionAddress : developmentAddress,
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 app.use(morgan("common"));
 // parse requests of content-type - application/json
 app.use(bodyParser.json());
@@ -81,7 +88,7 @@ async function startServer() {
     await createAdminUser(); // Call the function to create the admin user
 
     app.listen(port, () => {
-      console.log(`Server is running on port ${port}`);
+      console.log(`Server is running on port ${port} in ${environmentRuntime}`);
     });
   } catch (error) {
     console.error('Error starting server:', error);
