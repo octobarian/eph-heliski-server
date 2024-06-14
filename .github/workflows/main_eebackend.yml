@@ -46,6 +46,11 @@ jobs:
           DB_POOL_MIN: ${{ secrets.DB_POOL_MIN }}
           DB_POOL_ACQUIRE: ${{ secrets.DB_POOL_ACQUIRE }}
           DB_POOL_IDLE: ${{ secrets.DB_POOL_IDLE }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          AZURE_CLIENT_ADDRESS: ${{ secrets.AZURE_CLIENT_ADDRESS }}
+          DEVELOPMENT_CLIENT_ADDRESS: ${{ secrets.DEVELOPMENT_CLIENT_ADDRESS }}
+          NODE_ENV: ${{ secrets.NODE_ENV }}
           
       - name: Zip artifact for deployment
         run: zip release.zip ./* -r
