@@ -180,7 +180,6 @@ exports.findAll = (req, res) => {
     });
 };
 
-// Find a single Staff member with an id
 exports.findOne = (req, res) => {
     const id = req.params.id;
 
@@ -190,20 +189,31 @@ exports.findOne = (req, res) => {
                 model: Person,
                 as: 'person',
                 attributes: ['personid', 'firstname', 'lastname', 'mobilephone', 'email', 'country', 'dateofbirth', 'weight', 'isplaceholder']
-                // Add any other person attributes you need
             },
-            // If you have a Job model associated, include it here:
             {
                 model: Job,
                 as: 'job',
                 attributes: ['jobid', 'jobtitle'] // Add any other job attributes you need
+            },
+            {
+                model: UserLogin,
+                as: 'logins', // Use the correct alias defined in the association
+                attributes: ['email', 'role']
             }
         ],
         attributes: ['staffid', 'personid', 'jobid', 'isplaceholder'] // Add any other staff attributes you need
     })
     .then(staff => {
         if (staff) {
-            res.send(staff);
+            const canLogin = staff.logins.length > 0;
+            const role = canLogin ? staff.logins[0].role : 'N/A';
+            const loginEmail = canLogin? staff.logins[0].email : ''
+            res.send({
+                ...staff.toJSON(),
+                canLogin,
+                role,
+                loginEmail
+            });
         } else {
             res.status(404).send({
                 message: `Cannot find Staff with id=${id}.`
@@ -249,50 +259,91 @@ exports.findByEmail = (req, res) => {
   };
   
 
-exports.update = (req, res) => {
-    console.log('recieve request to update id:'+req.params.id);
+  exports.update = async (req, res) => {
+    console.log('Received request to update id:', req.params.id);
     console.log(req.body);
     const id = req.params.id;
-    const { staff, person } = req.body; // Destructuring to separate staff and person data
+    const { staff, person, canLogin, userLogin } = req.body; // Destructuring to separate staff, person, and login data
 
-    // Update Staff related data
-    Staff.update(staff, {
-        where: { staffid: id }
-    })
-    .then(num => {
-        if (num == 1) {
+    try {
+        // Update Staff related data
+        const staffUpdateResult = await Staff.update(staff, {
+            where: { staffid: id }
+        });
+
+        if (staffUpdateResult == 1) {
             // Update Person related data
-            Person.update(person, {
+            const personUpdateResult = await Person.update(person, {
                 where: { personid: staff.personid } // Assuming staff.personid holds the correct personid
-            })
-            .then(num => {
-                if (num == 1) {
-                    res.send({
-                        message: "Staff was updated successfully."
-                    });
-                } else {
-                    res.send({
-                        message: `Cannot update Person with id=${staff.personid}.`
-                    });
-                }
-            })
-            .catch(err => {
-                res.status(500).send({
-                    message: "Error updating Person with id=" + staff.personid
-                });
             });
+
+            if (personUpdateResult == 1) {
+                // Handle UserLogin data
+                const existingLogin = await UserLogin.findOne({
+                    where: { staff_id: id }
+                });
+
+                if (existingLogin) {
+                    // UserLogin exists
+                    if (!canLogin) {
+                        // Delete existing UserLogin if canLogin is now false
+                        await UserLogin.destroy({
+                            where: { staff_id: id }
+                        });
+                    } else {
+                        // Update existing UserLogin if canLogin remains true
+                        const { email, password, role } = userLogin;
+                        let passwordHash = existingLogin.password_hash;
+
+                        // Hash the new password if provided
+                        if (password) {
+                            passwordHash = await bcrypt.hash(password, saltRounds);
+                        }
+
+                        await UserLogin.update({
+                            email: email,
+                            password_hash: passwordHash,
+                            role: role
+                        }, {
+                            where: { staff_id: id }
+                        });
+                    }
+                } else {
+                    // Create a new UserLogin if canLogin is now true
+                    if (canLogin) {
+                        const { email, password, role } = userLogin;
+                        const passwordHash = await bcrypt.hash(password, saltRounds);
+
+                        await UserLogin.create({
+                            email: email,
+                            password_hash: passwordHash,
+                            role: role,
+                            staff_id: id
+                        });
+                    }
+                }
+
+                res.send({
+                    message: "Staff was updated successfully."
+                });
+            } else {
+                res.send({
+                    message: `Cannot update Person with id=${staff.personid}.`
+                });
+            }
         } else {
             res.send({
                 message: `Cannot update Staff with id=${id}.`
             });
         }
-    })
-    .catch(err => {
+    } catch (err) {
+        console.error("Error: ", err);
         res.status(500).send({
             message: "Error updating Staff with id=" + id
         });
-    });
+    }
 };
+
 
 exports.fetchJobs = (req, res) => {
     Job.findAll({
