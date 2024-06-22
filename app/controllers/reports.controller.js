@@ -679,7 +679,11 @@ exports.groupListReport = (req, res) => {
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
                 heliIndex: tripIndex + 1,
                 groups: sortedGroups.map((group, groupIndex) => {
-                    const guide = group.guide ? `${group.guide.person.firstname} ${group.guide.person.lastname}` : 'No guide';
+                    //const guide = group.guide ? `${group.guide.person.firstname} ${group.guide.person.lastname}` : 'No guide';
+                    const guide = group.guide ? group.guide.person : null;
+                    const guideFirstName = guide ? guide.firstname : 'No guide';
+                    const guideLastName = guide ? guide.lastname : 'No guide';
+                    const guideWeight = guide ? group.guide.person.weight ? group.guide.person.weight.toString() : 'N/A' : 'No guide';
                     const clients = group.tripClients.map(tc => {
                         const person = tc.reservation.person;
                         let hasAllergies = false;
@@ -704,12 +708,15 @@ exports.groupListReport = (req, res) => {
                             firstName: person.firstname,
                             weight: person.weight || 'N/A',
                             beaconNumber: tc.beacon ? tc.beacon.beaconnumber : 'N/A',
-                            hasAllergies: hasAllergies
+                            hasAllergies: hasAllergies,
                         };
                     });
 
                     return {
-                        guide,
+                        groupIndex: groupIndex + 1,
+                        guideFirstName,
+                        guideLastName,
+                        guideWeight, // separate it first last weight
                         clients,
                         fuelPercentage: 35.9 // Placeholder
                     };
