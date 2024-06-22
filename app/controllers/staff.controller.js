@@ -259,7 +259,7 @@ exports.findByEmail = (req, res) => {
   };
   
 
-  exports.update = async (req, res) => {
+exports.update = async (req, res) => {
     console.log('Received request to update id:', req.params.id);
     console.log(req.body);
     const id = req.params.id;
@@ -271,13 +271,13 @@ exports.findByEmail = (req, res) => {
             where: { staffid: id }
         });
 
-        if (staffUpdateResult == 1) {
+        if (staffUpdateResult[0] === 1) {
             // Update Person related data
             const personUpdateResult = await Person.update(person, {
                 where: { personid: staff.personid } // Assuming staff.personid holds the correct personid
             });
 
-            if (personUpdateResult == 1) {
+            if (personUpdateResult[0] === 1) {
                 // Handle UserLogin data
                 const existingLogin = await UserLogin.findOne({
                     where: { staff_id: id }
@@ -327,12 +327,12 @@ exports.findByEmail = (req, res) => {
                     message: "Staff was updated successfully."
                 });
             } else {
-                res.send({
+                res.status(500).send({
                     message: `Cannot update Person with id=${staff.personid}.`
                 });
             }
         } else {
-            res.send({
+            res.status(500).send({
                 message: `Cannot update Staff with id=${id}.`
             });
         }
@@ -343,6 +343,7 @@ exports.findByEmail = (req, res) => {
         });
     }
 };
+
 
 
 exports.fetchJobs = (req, res) => {
