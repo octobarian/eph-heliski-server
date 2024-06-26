@@ -52,8 +52,12 @@ module.exports = (sequelize, Sequelize) => {
         triptype: {
             type: Sequelize.STRING,
             allowNull: true
+        },
+        sortingindex: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            defaultValue: 1
         }
-        // Add any additional fields here as needed
     },{
         tableName: 'trips',
         timestamps: false // Assuming you don't have createdAt and updatedAt columns
@@ -74,7 +78,7 @@ module.exports = (sequelize, Sequelize) => {
         });
         Trip.hasMany(models.TripGroup, {
             foreignKey: 'trip_id',
-            as: 'tripGroups' 
+            as: 'tripGroups'
         });
     };
 
