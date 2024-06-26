@@ -130,7 +130,7 @@ exports.create = (req, res) => {
 
 exports.updateTrip = async (req, res) => {
     const tripId = req.params.id;
-    let { pilotid, helicopterid, start_date, end_date, triptype } = req.body;
+    let { pilotid, helicopterid, start_date, end_date, triptype, sortingindex } = req.body;
 
     // Check if pilotid or helicopterid are undefined or empty and set them to null
     pilotid = pilotid ? pilotid : null;
@@ -139,12 +139,13 @@ exports.updateTrip = async (req, res) => {
     // Prepare the update object
     let updateObj = { pilotid, helicopterid };
 
-    // Conditionally add start_date, end_date, and tripType to the update object if they are provided
+    // Conditionally add start_date, end_date, triptype, and sortingIndex to the update object if they are provided
     if (start_date) updateObj.start_date = start_date;
     if (end_date) updateObj.end_date = end_date;
     if (triptype) updateObj.triptype = triptype;
+    if (sortingindex !== undefined) updateObj.sortingindex = sortingindex;
 
-    console.log("Updating trip ID:", tripId, "  Pilot ID:", pilotid, "  Helicopter ID:", helicopterid, "  Start Date:", start_date, "  End Date:", end_date, "  Trip Type:", triptype);
+    console.log("Updating trip ID:", tripId, "  Pilot ID:", pilotid, "  Helicopter ID:", helicopterid, "  Start Date:", start_date, "  End Date:", end_date, "  Trip Type:", triptype, "  Sorting Index:", sortingindex);
 
     try {
         // Start a transaction
@@ -173,6 +174,7 @@ exports.updateTrip = async (req, res) => {
         });
     }
 };
+
 
 
 exports.updateGroupDate = async (req, res) => {
@@ -443,12 +445,14 @@ exports.findByDate = (req, res) => {
                         as: 'note'
                     }
                 ],
-                attributes: ['trip_group_id', 'start_date', 'end_date'],
-                order: ['trip_group_id', 'ASC']
+                attributes: ['trip_group_id', 'start_date', 'end_date']
             },
         ],
+        attributes: ['tripid', 'sortingindex', 'date', 'start_date', 'end_date', 'totalvertical', 'triptype', 'pilotid', 'helicopterid'],
         order: [
-            ['tripid', 'ASC']
+            ['sortingindex', 'ASC'],
+            ['tripid', 'ASC'],
+            [{ model: TripGroup, as: 'tripGroups' }, 'trip_group_id', 'ASC']
         ]
     })
     .then(data => {
@@ -513,6 +517,7 @@ exports.findByDate = (req, res) => {
 
             return {
                 tripId: trip.tripid,
+                sortingindex: trip.sortingindex,
                 date: trip.date,
                 start_date: trip.start_date,
                 end_date: trip.end_date,
@@ -539,6 +544,111 @@ exports.findByDate = (req, res) => {
             errorDetails: err.message,
         });
     });
+};
+
+
+const calculateFuelPercentage = async (tripGroupId) => {
+    try {
+        console.log('looking for tripGroup ' + tripGroupId);
+        const tripGroup = await TripGroup.findOne({
+            where: { trip_group_id: tripGroupId },
+            include: [
+                {
+                    model: TripClient,
+                    as: 'tripClients',
+                    include: [
+                        {
+                            model: Reservation,
+                            as: 'reservation',
+                            include: {
+                                model: Person,
+                                as: 'person',
+                                attributes: ['weight']
+                            }
+                        }
+                    ]
+                },
+                {
+                    model: Staff,
+                    as: 'guide',
+                    include: {
+                        model: Person,
+                        as: 'person',
+                        attributes: ['weight']
+                    }
+                }
+            ]
+        });
+
+        if (!tripGroup) {
+            throw new Error(`Trip Group with ID ${tripGroupId} not found`);
+        }
+
+        const trip = await Trip.findOne({
+            where: { tripid: tripGroup.trip_id },
+            include: [
+                {
+                    model: Helicopter,
+                    as: 'helicopter',
+                    attributes: ['maxweight', 'weight']
+                },
+                {
+                    model: Staff,
+                    as: 'pilot',
+                    include: {
+                        model: Person,
+                        as: 'person',
+                        attributes: ['weight']
+                    }
+                }
+            ]
+        });
+
+        if (!trip) {
+            throw new Error(`Trip with ID ${tripGroup.trip_id} not found`);
+        }
+
+        const helicopter = trip.helicopter;
+        const pilot = trip.pilot.person;
+        const guide = tripGroup.guide ? tripGroup.guide.person : { weight: 0 }; // Default to 0 if no guide
+
+        // Calculate total guest weight
+        const guestWeight = tripGroup.tripClients.reduce((total, client) => {
+            const personWeight = client.reservation && client.reservation.person ? client.reservation.person.weight : 0;
+            return total + (parseFloat(personWeight) || 0);
+        }, 0);
+
+        const grossWeight = parseFloat(helicopter.maxweight);
+        const emptyWeight = parseFloat(helicopter.weight);
+        const pilotWeight = parseFloat(pilot.weight) || 0;
+        const rescueGearLunchWeight = 152;
+        const guideGuestWeight = (parseFloat(guide.weight) || 0) + guestWeight;
+
+        const usefulLoad = grossWeight - emptyWeight - pilotWeight - rescueGearLunchWeight - guideGuestWeight;
+        const fuelPercentage = usefulLoad / 10;
+
+        console.log('For TripGroupId=' + tripGroupId);
+        console.log('grossWeight=' + grossWeight + "  emptyWeight=" + emptyWeight + "  pilotWeight=" + pilotWeight + "  RGLweight=" + rescueGearLunchWeight + "  guideGuestWeight=" + guideGuestWeight);
+        console.log('usefulLoad=' + usefulLoad + "  fuelPercentage=" + fuelPercentage);
+        return fuelPercentage;
+    } catch (error) {
+        console.error("Error calculating fuel percentage:", error);
+        throw error;
+    }
+};
+
+exports.getTripGroupFuelPercentage = async (req, res) => {
+    const { tripGroupId } = req.params;
+
+    try {
+        const fuelPercentage = await calculateFuelPercentage(tripGroupId);
+        res.json({ tripGroupId, fuelPercentage });
+    } catch (error) {
+        res.status(500).send({
+            message: "An error occurred while calculating the fuel percentage.",
+            errorDetails: error.message,
+        });
+    }
 };
 
 

@@ -21,7 +21,6 @@ module.exports = app => {
     // Update the route to include tripId in the URL path
     router.put("/groupDate/:tripId/:groupId", trips.updateGroupDate);
 
-
     router.put("/id/:id", trips.updateTrip);
 
     // Fetch guides
@@ -53,6 +52,9 @@ module.exports = app => {
 
     // New route for updating training
     router.post("/updateTraining", trips.updateTraining);
+
+    // Route for calculating fuel percentage for a trip group
+    router.get("/group/:tripGroupId/fuelPercentage", trips.getTripGroupFuelPercentage);
 
     app.use('/api/trips', router);
 };

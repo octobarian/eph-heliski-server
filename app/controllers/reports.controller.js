@@ -108,7 +108,7 @@ exports.dailyTripsReport = (req, res) => {
                 attributes: ['trip_group_id', 'start_date', 'end_date'] // Include group details
             },
         ],
-        order: [['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
+        order: [['sortingindex','ASC'], ['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
     })
     .then(trips => {
 
@@ -243,7 +243,7 @@ exports.medicalReport = (req, res) => {
                                     include: [{
                                         model: PersonCustomField,
                                         as: 'customFields',
-                                        attributes: [['custom_field_option_id','custom_f'],['field_name', 'field_na'], ['field_value', 'field_va']],
+                                        attributes: [['custom_field_option_id', 'custom_f'], ['field_name', 'field_na'], ['field_value', 'field_va']],
                                         required: false
                                     }]
                                 }],
@@ -265,9 +265,10 @@ exports.medicalReport = (req, res) => {
                 ],
                 attributes: ['trip_group_id', 'start_date', 'end_date']
             },
-        ]
-    }).then(trips => {
-
+        ],
+        order: [['sortingindex','ASC'], ['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
+    })
+    .then(trips => {
         const customFieldToReportHeaderMapping = {
             6: 'Medical Con',
             25: "Allergy RX",
@@ -280,28 +281,23 @@ exports.medicalReport = (req, res) => {
             54: "Severity",
         };
 
-        // Ensure trips and groups are sorted
-        const sortedTrips = trips.sort((a, b) => a.tripid - b.tripid);
-        const reportData = sortedTrips.map((trip, tripIndex) => {
-            const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
+        const reportData = trips.map((trip, tripIndex) => {
             return {
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
                 heliIndex: tripIndex + 1,
-                groups: sortedGroups.map((group, groupIndex) => {
+                groups: trip.tripGroups.map((group, groupIndex) => {
                     return {
                         groupId: group.trip_group_id,
                         groupIndex: groupIndex + 1,
                         clients: group.tripClients.map(tc => {
                             const person = tc.reservation.person;
 
-                            // Map the customFields to the report's expected structure
                             const mappedCustomFields = {};
                             person.customFields.forEach(cf => {
                                 const header = customFieldToReportHeaderMapping[cf.dataValues.custom_f];
                                 let fieldValue = cf.dataValues.field_va;
 
-                                // Clean up the field values
                                 if (header === 'Medical Con' && (fieldValue === 'No Medical Conditions' || fieldValue === '{}')) {
                                     fieldValue = '';
                                 }
@@ -333,7 +329,7 @@ exports.medicalReport = (req, res) => {
                         }),
                         fuelPercentage: 35.9 // Placeholder
                     };
-                }),
+                })
             };
         });
 
@@ -347,6 +343,7 @@ exports.medicalReport = (req, res) => {
         });
     });
 };
+
 
 
 exports.lunchReport = (req, res) => {
@@ -422,7 +419,7 @@ exports.lunchReport = (req, res) => {
         ]
     }).then(trips => {
         // Ensure trips and groups are sorted
-        const sortedTrips = trips.sort((a, b) => a.tripid - b.tripid);
+        const sortedTrips = trips.sort((a, b) => a.sortingindex - b.sortingindex || a.tripid - b.tripid);
         const reportData = sortedTrips.map((trip, tripIndex) => {
             const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
             return {
@@ -561,11 +558,11 @@ exports.dailyShuttleReport = async (req, res) => {
                     attributes: ['staffid']
                 },
             ],
-            order: [['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
+            order: [['sortingindex','ASC'], ['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
         });
 
         // Ensure trips and groups are sorted
-        const sortedTrips = trips.sort((a, b) => a.tripid - b.tripid);
+        const sortedTrips = trips.sort((a, b) => a.sortingindex - b.sortingindex || a.tripid - b.tripid);
         const sortedReportData = sortedTrips.flatMap((trip, tripIndex) => {
             const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
             return sortedGroups.flatMap((group, groupIndex) =>
@@ -669,7 +666,7 @@ exports.groupListReport = (req, res) => {
                 attributes: ['trip_group_id', 'start_date', 'end_date']
             },
         ],
-        order: [['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
+        order: [['sortingindex','ASC'], ['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
     })
     .then(trips => {
         const reportData = trips.map((trip, tripIndex) => {
@@ -816,7 +813,7 @@ exports.dailyRentalReport = (req, res) => {
         var totalski =0;
         var totalboard =0;
         var totalRental =0;
-        const sortedTrips = trips.sort((a, b) => a.tripid - b.tripid);
+        const sortedTrips = trips.sort((a, b) => a.sortingindex - b.sortingindex || a.tripid - b.tripid);
         const reportData = sortedTrips.map((trip, tripIndex) => {
             const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
             return {
