@@ -5,11 +5,11 @@ module.exports = (sequelize, Sequelize) => {
             primaryKey: true,
             autoIncrement: true
         },
-        trip_id: { // Foreign key to 'trips' table
+        trip_id: {
             type: Sequelize.INTEGER,
             allowNull: false,
             references: {
-                model: 'trips', // This should match the table name as defined in Sequelize
+                model: 'trips',
                 key: 'tripid'
             }
         },
@@ -21,15 +21,23 @@ module.exports = (sequelize, Sequelize) => {
             type: Sequelize.DATE,
             allowNull: false
         },
-        guide_id: { // Foreign key to 'staff' table
+        guide_id: {
             type: Sequelize.INTEGER,
             allowNull: true,
             references: {
-                model: 'staff', // This should match the table name as defined in Sequelize
+                model: 'staff',
                 key: 'staffid'
             }
         },
-        noteid: { // Foreign key to 'notes' table
+        guide_additional_id: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'staff',
+                key: 'staffid'
+            }
+        },
+        noteid: {
             type: Sequelize.INTEGER,
             allowNull: true,
             references: {
@@ -37,7 +45,6 @@ module.exports = (sequelize, Sequelize) => {
                 key: 'noteid'
             }
         }
-        // Add other attributes like group name, level, etc., if needed
     }, {
         tableName: 'trip_groups',
         timestamps: false
@@ -51,6 +58,10 @@ module.exports = (sequelize, Sequelize) => {
         TripGroup.belongsTo(models.Staff, {
             foreignKey: 'guide_id',
             as: 'guide'
+        });
+        TripGroup.belongsTo(models.Staff, {
+            foreignKey: 'guide_additional_id',
+            as: 'guideAdditional'
         });
         TripGroup.hasMany(models.TripClient, {
             foreignKey: 'trip_group_id',
