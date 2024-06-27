@@ -1,4 +1,4 @@
-require('dotenv').config(); // This will load environment variables from the .env file
+require('dotenv').config();
 
 module.exports = {
   development: {
@@ -6,7 +6,7 @@ module.exports = {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     host: process.env.DB_HOST,
-    dialect: process.env.DB_DIALECT,
+    dialect: 'postgres',
     pool: {
       max: parseInt(process.env.DB_POOL_MAX, 10),
       min: parseInt(process.env.DB_POOL_MIN, 10),
@@ -19,7 +19,7 @@ module.exports = {
     password: process.env.AZURE_DB_PASSWORD,
     database: process.env.AZURE_DB_NAME,
     host: process.env.AZURE_DB_HOST,
-    dialect: process.env.AZURE_DB_DIALECT,
+    dialect: 'postgres',
     pool: {
       max: parseInt(process.env.AZURE_DB_POOL_MAX, 10),
       min: parseInt(process.env.AZURE_DB_POOL_MIN, 10),
