@@ -1,1 +1,0 @@
-ALTER TABLE person_custom_fields ALTER COLUMN field_value TYPE text;
