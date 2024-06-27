@@ -16,4 +16,4 @@ module.exports = {
     // Remove 'inactive' job title if it exists
     await queryInterface.bulkDelete('job', { jobtitle: 'inactive' }, {});
   }
-};
+}; 
