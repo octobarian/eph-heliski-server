@@ -2,8 +2,11 @@ const { sequelize } = require('../models'); // Adjust the path to your Sequelize
 const { exec } = require('child_process');
 
 async function runMigrations() {
+    const env = process.env.NODE_ENV || 'development'; // Default to development if NODE_ENV is not set
+    const command = `npx sequelize-cli db:migrate --env ${env}`;
+
     try {
-        exec('npx sequelize-cli db:migrate --env production', (error, stdout, stderr) => {
+        exec(command, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error executing migration: ${error}`);
                 throw error;
