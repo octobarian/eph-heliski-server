@@ -1,23 +1,27 @@
 const { sequelize } = require('../models'); // Adjust the path to your Sequelize instance
-const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 async function runMigrations() {
-    const env = process.env.NODE_ENV || 'development'; // Default to development if NODE_ENV is not set
-    const command = `npx sequelize-cli db:migrate --env ${env}`;
-
+    const migrationsDir = path.join(__dirname, '../migrations-sql');
+    
     try {
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error executing migration: ${error}`);
-                throw error;
+        const files = fs.readdirSync(migrationsDir).filter(file => file.endsWith('.sql'));
+        
+        for (const file of files) {
+            const filePath = path.join(migrationsDir, file);
+            const migrationQuery = fs.readFileSync(filePath, 'utf8');
+            
+            try {
+                await sequelize.query(migrationQuery);
+                console.log(`Migration ${file} executed successfully`);
+            } catch (error) {
+                console.error(`Error executing migration ${file}:`, error);
+                throw error; // Stop further execution if any migration fails
             }
-            console.log(`Migration output: ${stdout}`);
-            if (stderr) {
-                console.error(`Migration stderr: ${stderr}`);
-            }
-        });
+        }
     } catch (error) {
-        console.error('Error running migrations:', error);
+        console.error('Error reading migration files:', error);
     }
 }
 
