@@ -951,6 +951,22 @@ exports.updateGroupShuttle = async (req, res) => {
     const { shuttleNumber, dropoffLocation, arrivalTime, flightTime, pickupLocation } = req.body;
 
     try {
+        if (shuttleNumber === null) {
+            // If shuttleNumber is null, delete the trip shuttle entry
+            const numDeleted = await TripShuttle.destroy({
+                where: {
+                    trip_id: tripId,
+                    tripclientid: clientId
+                }
+            });
+
+            if (numDeleted === 1) {
+                return res.send({ message: "Trip shuttle details deleted successfully." });
+            } else {
+                return res.status(404).send({ message: `Trip shuttle details not found for tripId=${tripId}, clientId=${clientId}` });
+            }
+        }
+
         // Find or create a trip shuttle entry
         const [tripShuttle, created] = await TripShuttle.findOrCreate({
             where: {
@@ -986,6 +1002,7 @@ exports.updateGroupShuttle = async (req, res) => {
     }
 };
 
+
 exports.fetchTripShuttles = async (req, res) => {
     const { tripIds, clientIds } = req.body;
 
@@ -1017,23 +1034,31 @@ exports.updateTraining = async (req, res) => {
         });
 
         if (existingTraining) {
-            // Update the existing training entry with the new date
-            existingTraining.trainingdate = trainingdate;
-            await existingTraining.save();
-
-            return res.status(200).send(existingTraining);
+            if (trainingdate === null) {
+                // Delete the existing training entry if trainingdate is null
+                await existingTraining.destroy();
+                return res.status(200).send({ message: "Training removed successfully." });
+            } else {
+                // Update the existing training entry with the new date
+                existingTraining.trainingdate = trainingdate;
+                await existingTraining.save();
+                return res.status(200).send(existingTraining);
+            }
         }
 
-        // Create a new training entry if no existing training was found
-        const newTraining = await PersonTraining.create({
-            personid: personid,
-            trainingtypeid: trainingtypeid,
-            trainingdate: trainingdate,
-            trainingfor: 'Alpine',
-            isplaceholder: false
-        });
+        // Create a new training entry if no existing training was found and trainingdate is not null
+        if (trainingdate !== null) {
+            const newTraining = await PersonTraining.create({
+                personid: personid,
+                trainingtypeid: trainingtypeid,
+                trainingdate: trainingdate,
+                trainingfor: 'Alpine',
+                isplaceholder: false
+            });
+            return res.status(201).send(newTraining);
+        }
 
-        res.status(201).send(newTraining);
+        res.status(400).send({ message: "Training date is required to add new training." });
     } catch (error) {
         console.error("Error occurred while updating training:", error);
         res.status(500).send({
@@ -1042,5 +1067,6 @@ exports.updateTraining = async (req, res) => {
         });
     }
 };
+
 
 // Other existing or needed endpoints for trips

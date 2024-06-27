@@ -22,9 +22,12 @@ module.exports = (sequelize, DataTypes) => {
         },
         notes: {
             type: DataTypes.STRING,
+            allowNull: true, 
+        },
+        inspectiondate: {
+            type: DataTypes.DATE,
             allowNull: true,
         }
-        
     },{
         tableName: 'beacons',
         timestamps: false // Assuming you don't have createdAt and updatedAt columns

@@ -16,7 +16,7 @@ module.exports = (sequelize, Sequelize) => {
         },
         shuttle_id: {
             type: Sequelize.INTEGER,
-            allowNull: false,
+            allowNull: true,
             references: {
                 model: 'shuttles', // References the "shuttles" table
                 key: 'id'
