@@ -24,6 +24,8 @@ jobs:
       - name: npm install, build, and test
         run: |
           npm install
+          npm install -g sequelize-cli, yargs
+          npx sequelize-cli db:migrate --env production
           npm run build --if-present
         env:
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
@@ -91,3 +93,35 @@ jobs:
           slot-name: 'Production'
           package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_BCD115A8640A4F1695921011F36D4FC7 }}
+     
+      - name: Install sequelize-cli globally
+        run: npm install -g sequelize-cli
+
+      - name: Run database migrations
+        run: npx sequelize-cli db:migrate --env production
+        env:
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_SECRET: ${{ secrets.SERVER_SECRET }}
+          SERVER_ENCRYPTION_KEY: ${{ secrets.SERVER_ENCRYPTION_KEY }}
+          SERVER_SECRET_KEY: ${{ secrets.SERVER_SECRET_KEY }}
+          VUE_APP_IP: ${{ secrets.VUE_APP_IP }}
+          VUE_APP_PORT: ${{ secrets.VUE_APP_PORT }}
+          TZ: ${{ secrets.TZ }}
+          ZAPI_TOKEN: ${{ secrets.ZAPI_TOKEN }}
+          ZAPI_ACCOUNT_ID: ${{ secrets.ZAPI_ACCOUNT_ID }}
+          ZAPI_USER_ID: ${{ secrets.ZAPI_USER_ID }}
+          ZAPI_URL: ${{ secrets.ZAPI_URL }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_DIALECT: ${{ secrets.DB_DIALECT }}
+          DB_POOL_MAX: ${{ secrets.DB_POOL_MAX }}
+          DB_POOL_MIN: ${{ secrets.DB_POOL_MIN }}
+          DB_POOL_ACQUIRE: ${{ secrets.DB_POOL_ACQUIRE }}
+          DB_POOL_IDLE: ${{ secrets.DB_POOL_IDLE }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          AZURE_CLIENT_ADDRESS: ${{ secrets.AZURE_CLIENT_ADDRESS }}
+          DEVELOPMENT_CLIENT_ADDRESS: ${{ secrets.DEVELOPMENT_CLIENT_ADDRESS }}
+          NODE_ENV: ${{ secrets.NODE_ENV }}
