@@ -102,6 +102,7 @@ db.tripClients.belongsTo(db.reservation, { foreignKey: 'reservationid', as: 'res
 db.trips.hasMany(db.tripGroups, { foreignKey: 'trip_id', as: 'tripGroups' });
 db.staffs.hasMany(db.tripGroups, { foreignKey: 'guide_id', as: 'guidedGroups' });
 db.tripGroups.belongsTo(db.staffs, { foreignKey: 'guide_id', as: 'guide' });
+db.tripGroups.belongsTo(db.staffs, { foreignKey: 'guide_additional_id', as: 'guideAdditional' });
 db.tripClients.belongsTo(db.tripGroups, { foreignKey: 'trip_group_id', as: 'tripGroup' });
 db.tripGroups.hasMany(db.tripClients, { foreignKey: 'trip_group_id', as: 'tripClients' });
 db.tripGroups.belongsTo(db.notes, { foreignKey: 'noteid', as: 'note' });

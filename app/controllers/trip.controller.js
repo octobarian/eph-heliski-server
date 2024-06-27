@@ -289,24 +289,26 @@ exports.fetchGuides = (req, res) => {
 
 exports.updateGroupGuide = async (req, res) => {
     const { groupId } = req.params;
-    const { guideId } = req.body;
-    console.log('FOUND GUIDEID: '+guideId);
-    console.log('FOUND GROUPID: '+groupId);
-  
+    const { guideId, guideAdditionalId } = req.body;
+
+    console.log(`Trying To Update Group ${groupId} with Guide: ${guideId} and addguide: ${guideAdditionalId}`);
     try {
-      const group = await TripGroup.findByPk(groupId);
-      if (group) {
-        group.guide_id = guideId;
-        await group.save();
-        res.send({ message: "Guide updated successfully." });
-      } else {
-        res.status(404).send({ message: "Group not found." });
-      }
+        const group = await TripGroup.findByPk(groupId);
+        if (group) {
+            group.guide_id = Array.isArray(guideId) ? guideId[0] || null : guideId;
+            group.guide_additional_id = Array.isArray(guideId) ? guideId[1] || null : guideAdditionalId || null;
+            await group.save();
+            res.send({ message: "Guide(s) updated successfully." });
+        } else {
+            res.status(404).send({ message: "Group not found." });
+        }
     } catch (error) {
-      res.status(500).send({ message: "Error updating guide for group." });
+        console.error("Error updating guide(s) for group:", error);
+        res.status(500).send({ message: "Error updating guide(s) for group." });
     }
-  };
-  
+};
+
+
 
 // Fetch pilots from the database (jobid 1 for pilots)
 exports.fetchPilots = (req, res) => {
@@ -345,7 +347,6 @@ exports.fetchHelicopters = (req, res) => {
         });
     });
 };
-
 exports.findByDate = (req, res) => {
     const date = req.params.date;
 
@@ -441,6 +442,14 @@ exports.findByDate = (req, res) => {
                         }
                     },
                     {
+                        model: Staff,
+                        as: 'guideAdditional',
+                        include: {
+                            model: Person,
+                            as: 'person'
+                        }
+                    },
+                    {
                         model: Note,
                         as: 'note'
                     }
@@ -474,6 +483,12 @@ exports.findByDate = (req, res) => {
                     guideid: group.guide.staffid,
                     firstname: group.guide.person.firstname,
                     lastname: group.guide.person.lastname
+                } : null;
+
+                const guideAdditional = group.guideAdditional ? {
+                    guideid: group.guideAdditional.staffid,
+                    firstname: group.guideAdditional.person.firstname,
+                    lastname: group.guideAdditional.person.lastname
                 } : null;
 
                 const clients = group.tripClients.map(client => {
@@ -510,6 +525,7 @@ exports.findByDate = (req, res) => {
                     start_date: group.start_date,
                     end_date: group.end_date,
                     guide: guide,
+                    guideAdditional: guideAdditional,
                     clients: clients,
                     noteContent: group.note ? group.note.text : ''
                 };
@@ -528,7 +544,7 @@ exports.findByDate = (req, res) => {
                 groups: groups
             };
         });
-        res.send(formattedData);
+        res.send(formattedData); 
     })
     .catch(err => {
         console.error("Error occurred while retrieving trips:", err);
@@ -545,6 +561,7 @@ exports.findByDate = (req, res) => {
         });
     });
 };
+
 
 
 const calculateFuelPercentage = async (tripGroupId) => {
@@ -951,6 +968,22 @@ exports.updateGroupShuttle = async (req, res) => {
     const { shuttleNumber, dropoffLocation, arrivalTime, flightTime, pickupLocation } = req.body;
 
     try {
+        if (shuttleNumber === null) {
+            // If shuttleNumber is null, delete the trip shuttle entry
+            const numDeleted = await TripShuttle.destroy({
+                where: {
+                    trip_id: tripId,
+                    tripclientid: clientId
+                }
+            });
+
+            if (numDeleted === 1) {
+                return res.send({ message: "Trip shuttle details deleted successfully." });
+            } else {
+                return res.status(404).send({ message: `Trip shuttle details not found for tripId=${tripId}, clientId=${clientId}` });
+            }
+        }
+
         // Find or create a trip shuttle entry
         const [tripShuttle, created] = await TripShuttle.findOrCreate({
             where: {
@@ -986,6 +1019,7 @@ exports.updateGroupShuttle = async (req, res) => {
     }
 };
 
+
 exports.fetchTripShuttles = async (req, res) => {
     const { tripIds, clientIds } = req.body;
 
@@ -1017,23 +1051,31 @@ exports.updateTraining = async (req, res) => {
         });
 
         if (existingTraining) {
-            // Update the existing training entry with the new date
-            existingTraining.trainingdate = trainingdate;
-            await existingTraining.save();
-
-            return res.status(200).send(existingTraining);
+            if (trainingdate === null) {
+                // Delete the existing training entry if trainingdate is null
+                await existingTraining.destroy();
+                return res.status(200).send({ message: "Training removed successfully." });
+            } else {
+                // Update the existing training entry with the new date
+                existingTraining.trainingdate = trainingdate;
+                await existingTraining.save();
+                return res.status(200).send(existingTraining);
+            }
         }
 
-        // Create a new training entry if no existing training was found
-        const newTraining = await PersonTraining.create({
-            personid: personid,
-            trainingtypeid: trainingtypeid,
-            trainingdate: trainingdate,
-            trainingfor: 'Alpine',
-            isplaceholder: false
-        });
+        // Create a new training entry if no existing training was found and trainingdate is not null
+        if (trainingdate !== null) {
+            const newTraining = await PersonTraining.create({
+                personid: personid,
+                trainingtypeid: trainingtypeid,
+                trainingdate: trainingdate,
+                trainingfor: 'Alpine',
+                isplaceholder: false
+            });
+            return res.status(201).send(newTraining);
+        }
 
-        res.status(201).send(newTraining);
+        res.status(400).send({ message: "Training date is required to add new training." });
     } catch (error) {
         console.error("Error occurred while updating training:", error);
         res.status(500).send({
@@ -1042,5 +1084,6 @@ exports.updateTraining = async (req, res) => {
         });
     }
 };
+
 
 // Other existing or needed endpoints for trips

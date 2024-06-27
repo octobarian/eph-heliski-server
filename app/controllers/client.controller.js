@@ -193,14 +193,40 @@ exports.findByName = (req, res) => {
     });
 };
 
-
+// Update the weight of a Person by the personid in the request
+exports.updateWeight = async (req, res) => {
+    const { personid } = req.params;
+    const { weight } = req.body;
+  
+    console.log(`Updating weight for personid=${personid} to ${weight}`);
+  
+    try {
+      const personUpdate = await Person.update({ weight }, {
+        where: { personid }
+      });
+  
+      if (personUpdate == 1) {
+        // Fetch the updated person and send it back
+        const updatedPerson = await Person.findByPk(personid);
+        res.send({ person: updatedPerson });
+      } else {
+        res.send({
+          message: `Cannot update Person with personid=${personid}. Maybe Person was not found or req.body is empty!`
+        });
+      }
+    } catch (err) {
+      res.status(500).send({
+        message: "Error updating Person with personid=" + personid
+      });
+    }
+  };
+  
   
 
 // Update a Client by the id in the request
 exports.update = async (req, res) => {
   const id = req.params.id;
   const { client, healthRecords } = req.body;
-
   try {
       // Update Person data
       const personUpdate = await Person.update(client, {

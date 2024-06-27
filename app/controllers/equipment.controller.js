@@ -4,6 +4,7 @@ const Beacon = db.beacons;
 const TripClient = db.tripClients;
 const Client = db.clients;
 const Person = db.persons;
+const Trip = db.trips;
 
 exports.findAllBeacons = (req, res) => {
     Beacon.findAll({
@@ -61,13 +62,12 @@ exports.createBeacon = async (req, res) => {
         if (!req.body.beaconNumber) {
             return res.status(400).send({ message: "Beacon number cannot be empty!" });
         }
-        console.log('CREATING BEACON');
-        console.log(req.body.beaconNumber);
 
         const beacon = {
             beaconnumber: req.body.beaconNumber,
             active: true,
-            tripclientid: null
+            tripclientid: null,
+            inspectionDate: req.body.inspectionDate || null
         };
 
         const newBeacon = await Beacon.create(beacon);
@@ -76,6 +76,29 @@ exports.createBeacon = async (req, res) => {
         res.status(500).send({ message: err.message || "Error occurred while creating the Beacon." });
     }
 };
+
+exports.updateBeacon = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { beaconnumber, active, inspectiondate } = req.body;
+
+        const num = await Beacon.update({ 
+            beaconnumber,
+            active,
+            inspectiondate
+        }, { where: { beaconid: id } });
+
+        if (num == 1) {
+            res.send({ message: "Beacon was updated successfully." });
+        } else {
+            res.send({ message: `Cannot update Beacon with id=${id}. Maybe Beacon was not found or req.body is empty!` });
+        }
+    } catch (err) {
+        res.status(500).send({ message: "Error updating Beacon with id=" + req.params.id });
+    }
+};
+
+
 
 exports.deleteBeacon = async (req, res) => {
     try {
@@ -191,20 +214,30 @@ exports.createHelicopter = async (req, res) => {
         res.status(500).send({ message: err.message || "Some error occurred while creating the Helicopter." });
     }
 };
-
 exports.deleteHelicopter = async (req, res) => {
     try {
-        const id = req.params.id;
-        const num = await Helicopter.destroy({ where: { helicopterid: id } });
-        if (num == 1) {
-            res.send({ message: "Helicopter was deleted successfully!" });
-        } else {
-            res.send({ message: `Cannot delete Helicopter with id=${id}. Maybe Helicopter was not found!` });
-        }
+      const id = req.params.id;
+  
+      // Step 1: Find all trips linked to the helicopter
+      const trips = await Trip.findAll({ where: { helicopterid: id } });
+  
+      // Step 2: Update the helicopterid of these trips to null
+      for (const trip of trips) {
+        await trip.update({ helicopterid: null });
+      }
+  
+      // Step 3: Proceed to delete the helicopter
+      const num = await Helicopter.destroy({ where: { helicopterid: id } });
+      if (num == 1) {
+        res.send({ message: "Helicopter was deleted successfully!" });
+      } else {
+        res.send({ message: `Cannot delete Helicopter with id=${id}. Maybe Helicopter was not found!` });
+      }
     } catch (err) {
-        res.status(500).send({ message: "Could not delete Helicopter with id=" + id });
+      res.status(500).send({ message: "Could not delete Helicopter with id=" + req.params.id });
     }
-};
+  };
+  
 
 exports.editHelicopter = async (req, res) => {
     try {
