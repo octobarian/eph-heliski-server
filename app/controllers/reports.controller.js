@@ -8,6 +8,7 @@ const Helicopter = db.helicopters;
 const Shuttle = db.shuttles;
 
 const Person = db.persons;
+const PersonTraining = db.persontraining;
 
 const TripStaff = db.tripStaff;
 const TripClient = db.tripClients;
@@ -32,9 +33,7 @@ const customFieldToReportHeaderMapping = {
 };
 
 exports.dailyTripsReport = (req, res) => {
-    // Get the date from the query parameters, default to today's date if not provided
     const date = req.query.date || new Date().toISOString().slice(0, 10);
-
 
     Trip.findAll({
         where: {
@@ -44,7 +43,6 @@ exports.dailyTripsReport = (req, res) => {
             ]
         },
         include: [
-            // Including helicopter, pilot, and their person details
             {
                 model: Helicopter,
                 as: 'helicopter',
@@ -59,7 +57,6 @@ exports.dailyTripsReport = (req, res) => {
                 },
                 attributes: ['staffid'],
             },
-            // Including trip groups, trip clients, their reservations, person and custom fields
             {
                 model: TripGroup,
                 as: 'tripGroups',
@@ -74,20 +71,27 @@ exports.dailyTripsReport = (req, res) => {
                                 include: [{
                                     model: Person,
                                     as: 'person',
-                                    attributes: ['firstname', 'lastname', 'weight', 'personid'],
-                                    include: [{
-                                        model: PersonCustomField,
-                                        as: 'customFields',
-                                        attributes: [['custom_field_option_id','custom_f'],['field_name', 'field_na'], ['field_value', 'field_va']],
-                                        required: false
-                                    }]
+                                    attributes: ['firstname', 'lastname', 'weight', 'personid', 'dateofbirth'],
+                                    include: [
+                                        {
+                                            model: PersonCustomField,
+                                            as: 'customFields',
+                                            attributes: [['custom_field_option_id','custom_f'],['field_name', 'field_na'], ['field_value', 'field_va']],
+                                            required: false
+                                        },
+                                        {
+                                            model: PersonTraining,
+                                            as: 'trainings',
+                                            attributes: ['trainingdate']
+                                        }
+                                    ]
                                 }],
-                                attributes: ['reservationid'] // Include reservation details
+                                attributes: ['reservationid']
                             },
                             {
                                 model: Beacon,
                                 as: 'beacon',
-                                attributes: ['beaconid', 'beaconnumber'], // Include beacon details
+                                attributes: ['beaconid', 'beaconnumber'],
                                 where: { active: true },
                                 required: false
                             }
@@ -100,40 +104,43 @@ exports.dailyTripsReport = (req, res) => {
                         include: {
                             model: Person,
                             as: 'person',
-                            attributes: ['firstname', 'lastname'] // Include only the guide's name
                         },
-                        attributes: ['staffid']
-                    }
+                    },
+                    {
+                        model: Staff,
+                        as: 'guideAdditional',
+                        include: {
+                            model: Person,
+                            as: 'person'
+                        }
+                    },
                 ],
-                attributes: ['trip_group_id', 'start_date', 'end_date'] // Include group details
+                attributes: ['trip_group_id', 'start_date', 'end_date']
             },
         ],
         order: [['sortingindex','ASC'], ['tripid', 'ASC'], ['tripGroups', 'trip_group_id', 'ASC']]
     })
     .then(trips => {
-
         trips.forEach((trip, tripIndex) => {
-            console.log(`Trip ${tripIndex + 1}:`);
             trip.tripGroups.forEach((group, groupIndex) => {
-                console.log(`  Group ${groupIndex + 1}:`);
                 group.tripClients.forEach((client, clientIndex) => {
                     const person = client.reservation.person;
-                    console.log(`    Client ${clientIndex + 1}: ${person.firstname}`);
                     person.customFields.forEach(cf => {
-                        console.log(`      Custom Field: ID=${cf.dataValues.custom_f}, Name=${cf.dataValues.field_na}, Value=${cf.dataValues.field_va}`);
                     });
                 });
             });
         });
 
-        // Transform the Sequelize data into the format expected by the report generator
         const reportData = trips.map((trip, tripIndex) => {
             return {
+                reportDate: date,
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname || 'Unknown'} ${trip.pilot.person.lastname || 'Pilot'}` : 'No pilot',
                 heliIndex: tripIndex + 1,
                 groups: trip.tripGroups.map((group, groupIndex) => {
                     return {
+                        guide: group.guide, 
+                        guide_additional: group.guide_additional, 
                         groupId: group.trip_group_id || 'N/A',
                         groupIndex: groupIndex + 1,
                         clients: group.tripClients.map(tc => {
@@ -141,42 +148,55 @@ exports.dailyTripsReport = (req, res) => {
                             let hasMedicalField = false;
                             let hasDietaryField = false;
                             let hasRiderType = '';
-                            
+                            let hasReturningGuest = '';
+                            let hasRiderAbility = '';
+
                             person.customFields.forEach(cf => {
                                 const fieldID = cf.dataValues.custom_f;
                                 const fieldValue = cf.dataValues.field_va;
                                 
-                                // Function to check if the field value is meaningful
                                 const isMeaningfulValue = (value) => {
-                                    if (!value) return false; // Handles null, undefined, and empty string
+                                    if (!value) return false;
                                     const lowerValue = value.toLowerCase();
-                                    // Check against 'no' and '{}' considering potential whitespace
                                     return lowerValue.trim() !== 'no' && lowerValue.trim() !== '{}';
                                 };
                             
-                                // Check for medical field presence and non-'No' and not '{}' value
                                 if ([30, 25, 26].includes(fieldID) && isMeaningfulValue(fieldValue)) {
                                     hasMedicalField = true;
                                 }
                             
-                                // Check for dietary field presence and non-'No' and not '{}' value
                                 if ([29, 31].includes(fieldID) && isMeaningfulValue(fieldValue)) {
                                     hasDietaryField = true;
                                 }
-                                // check ski or snowboard
+                                
                                 if ([52].includes(fieldID) && fieldValue) {
                                     hasRiderType = fieldValue;
                                 }
+
+                                if ([39].includes(fieldID) && fieldValue) {
+                                    hasReturningGuest = fieldValue;
+                                }
+
+                                if ([47].includes(fieldID) && fieldValue) {
+                                    hasRiderAbility = fieldValue;
+                                }
                             });
+
+                            const trainingDates = person.trainings.map(training => training.trainingdate);
 
                             return {
                                 firstName: person.firstname || 'Unknown',
                                 lastName: person.lastname || 'Client',
                                 weight: person.weight || 'N/A',
+                                dateOfBirth: person.dateofbirth || '',
+                                country: person.country || '',
+                                training: trainingDates.join(', ') || '',
                                 beacon: tc.beacon ? tc.beacon.beaconnumber : 'N/A',
                                 medical_fields: hasMedicalField,
                                 dietary_fields: hasDietaryField,
-                                ridertype: hasRiderType
+                                ridertype: hasRiderType,
+                                returning_guest: hasReturningGuest, 
+                                rider_ability: hasRiderAbility,
                             };
                         }),
                         fuelPercentage: 35.9 // Placeholder for actual fuel percentage calculation
@@ -185,7 +205,6 @@ exports.dailyTripsReport = (req, res) => {
                 .filter(group => group.clients && group.clients.length > 0)
             };
         })
-        // Filter out trips with no groups
         .filter(trip => trip.groups && trip.groups.length > 0);
     
         res.json(reportData);
@@ -283,6 +302,7 @@ exports.medicalReport = (req, res) => {
 
         const reportData = trips.map((trip, tripIndex) => {
             return {
+                reportDate: date,
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
                 heliIndex: tripIndex + 1,
@@ -423,6 +443,7 @@ exports.lunchReport = (req, res) => {
         const reportData = sortedTrips.map((trip, tripIndex) => {
             const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
             return {
+                reportDate: date,
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
                 heliIndex: tripIndex + 1,
@@ -569,6 +590,7 @@ exports.dailyShuttleReport = async (req, res) => {
                 group.tripClients.map(client => {
                     const tripShuttle = client.tripShuttles[0];
                     return {
+                        reportDate: date,
                         firstname: client.reservation.person.firstname,
                         lastname: client.reservation.person.lastname,
                         phone: client.reservation.person.mobilephone,
@@ -672,6 +694,7 @@ exports.groupListReport = (req, res) => {
         const reportData = trips.map((trip, tripIndex) => {
             const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
             return {
+                reportDate: date,
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
                 heliIndex: tripIndex + 1,
@@ -809,77 +832,78 @@ exports.dailyRentalReport = (req, res) => {
             58: 'Size'
         };
 
-        // Ensure trips and groups are sorted
-        var totalski =0;
-        var totalboard =0;
-        var totalRental =0;
+        let totalski = 0;
+        let totalboard = 0;
+
         const sortedTrips = trips.sort((a, b) => a.sortingindex - b.sortingindex || a.tripid - b.tripid);
         const reportData = sortedTrips.map((trip, tripIndex) => {
             const sortedGroups = trip.tripGroups.sort((a, b) => a.trip_group_id - b.trip_group_id);
+
             return {
                 //trip heli start
+                reportDate: date,
                 helicopterId: trip.helicopter ? trip.helicopter.callsign : 'NONE',
                 pilot: trip.pilot && trip.pilot.person ? `${trip.pilot.person.firstname} ${trip.pilot.person.lastname}` : 'No pilot',
                 heliIndex: tripIndex + 1,
                 groups: sortedGroups.map((group, groupIndex) => {
-                    var groupski = 0;
-                    var groupboard = 0;
+                    let groupski = 0;
+                    let groupboard = 0;
+
+                    const clients = group.tripClients.map(tc => {
+                        const person = tc.reservation.person;
+
+                        const mappedCustomFields = {};
+                        person.customFields.forEach(cf => {
+                            const header = customFieldToReportHeaderMapping[cf.dataValues.custom_f];
+                            let fieldValue = cf.dataValues.field_va;
+
+                            if (header === 'Rentals' && fieldValue === 'Skis') {
+                                groupski++;
+                            } else if (header === 'Rentals' && fieldValue === 'Snowboard') {
+                                groupboard++;
+                            }
+
+                            if (header === 'Rentals' && fieldValue === '{}') {
+                                fieldValue = '';
+                            }
+                            if (header === 'Preferred Ski/Board' && fieldValue === '{}') {
+                                fieldValue = '';
+                            }
+                            if (header === 'Size' && fieldValue === '{}') {
+                                fieldValue = '';
+                            }
+                            if (header && fieldValue) {
+                                mappedCustomFields[header] = (mappedCustomFields[header] || '') + fieldValue + '; ';
+                            }
+                        });
+
+                        return {
+                            firstName: person.firstname,
+                            lastName: person.lastname,
+                            rentals: mappedCustomFields['Rentals'] || 'No Rentals',
+                            preferredSkiBoard: mappedCustomFields['Preferred Ski/Board'] || 'N/A',
+                            size: mappedCustomFields['Size'] || 'N/A',
+                        };
+                    });
+
+                    totalski += groupski;
+                    totalboard += groupboard;
+
                     return {
                         groupId: group.trip_group_id,
                         groupIndex: groupIndex + 1,
-                        clients: group.tripClients.map(tc => {
-                            const person = tc.reservation.person;
-
-                            // Map the customFields to the report's expected structure
-                            const mappedCustomFields = {};
-                            person.customFields.forEach(cf => {
-                                const header = customFieldToReportHeaderMapping[cf.dataValues.custom_f];
-                                let fieldValue = cf.dataValues.field_va;
-                                
-                                // Clean up the field values
-                                if (header === 'Rentals' && fieldValue === '{}') {
-                                    fieldValue = '';
-                                }
-                                else if(header === 'Rentals' && fieldValue === 'Skis'){
-                                    groupski++;
-                                }
-                                else if(header === 'Rentals' && fieldValue === 'Snowboard'){
-                                    groupboard++;
-                                }
-                                if (header === 'Preferred Ski/Board' && fieldValue === '{}') {
-                                    fieldValue = '';
-                                }
-                                
-                                if (header === 'Size' && fieldValue === '{}') {
-                                    fieldValue = '';
-                                }
-                                if (header && fieldValue) {
-                                    mappedCustomFields[header] = (mappedCustomFields[header] || '') + fieldValue + '; ';
-                                }
-                            });
-                            totalboard += groupboard;
-                            totalski += groupski;
-
-                            return {
-                                firstName: person.firstname,
-                                lastName: person.lastname,
-                                rentals: mappedCustomFields['Rentals'] || 'No Rentals',
-                                preferredSkiBoard: mappedCustomFields['Preferred Ski/Board'] || 'N/A',
-                                size: mappedCustomFields['Size'] || 'N/A',
-                            };
-                        }),
+                        clients: clients,
                         groupski: groupski,
                         groupboard: groupboard,
-                        totalGroupRentals: groupski+groupboard,
+                        totalGroupRentals: groupski + groupboard,
                     };
                 }),
                 totalski: totalski,
                 totalboard: totalboard,
-                totalRental: totalski+totalboard,
+                totalRental: totalski + totalboard,
             };
-
         });
-        
+
         res.json(reportData);
     })
     .catch(err => {
@@ -890,4 +914,5 @@ exports.dailyRentalReport = (req, res) => {
         });
     });
 };
+
 
